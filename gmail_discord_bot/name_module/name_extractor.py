@@ -5,32 +5,27 @@ logger = setup_logger(__name__)
 
 class NameExtractor:
     def __init__(self):
-        # 署名を検出するための正規表現パターン
-        self.signature_patterns = [
-            r'--+\s*\n([\s\S]+)',  # "---" で始まる署名
-            r'^\s*(?:敬具|よろしくお願いします|よろしくお願い致します).*?\n([\s\S]+)',  # 日本語の締めの後の署名
-            r'(?:Regards|Sincerely|Best regards|Thanks|Thank you).*?\n([\s\S]+)',  # 英語の締めの後の署名
-        ]
+        # 簡素化：基本的な署名検出のみ
+        self.signature_pattern = r'--+\s*\n([\s\S]+)'  # "---" で始まる署名
     
     def extract_from_email(self, email_data):
-        """メールから送信者情報を抽出"""
+        """メールから送信者情報を抽出（簡素化版）"""
         sender = email_data['sender']
         body = email_data['body']
         
-        # 送信者文字列から情報を抽出
+        # 送信者文字列から基本情報を抽出
         sender_info = self._parse_sender_string(sender)
         
-        # 署名から情報を抽出
-        signature_info = self._extract_from_signature(body)
+        # 署名から会社名を抽出（簡素化）
+        company_name = self._extract_company_from_signature(body)
+        if company_name:
+            sender_info['company'] = company_name
         
-        # 情報を統合（署名の情報を優先）
+        # 基本情報のみを返す
         result = {
             'email': sender_info.get('email', ''),
-            'name': signature_info.get('name', sender_info.get('name', '')),
-            'company': signature_info.get('company', ''),
-            'department': signature_info.get('department', ''),
-            'title': signature_info.get('title', ''),
-            'phone': signature_info.get('phone', ''),
+            'name': sender_info.get('name', ''),
+            'company': sender_info.get('company', '')
         }
         
         logger.info(f"送信者情報を抽出: {result}")
@@ -57,30 +52,26 @@ class NameExtractor:
                 if username:
                     result['name'] = username
         
+        # ドメインから会社名を推測
+        if result['email'] and '@' in result['email']:
+            domain = result['email'].split('@')[1]
+            company_part = domain.split('.')[0]
+            if company_part and company_part not in ['gmail', 'yahoo', 'hotmail', 'outlook', 'icloud']:
+                result['company'] = company_part.capitalize()
+        
         return result
     
-    def _extract_from_signature(self, body):
-        """メール本文から署名情報を抽出"""
-        result = {}
-        
+    def _extract_company_from_signature(self, body):
+        """メール本文から会社名のみを抽出（簡素化）"""
         # 署名部分を抽出
-        signature = None
-        for pattern in self.signature_patterns:
-            match = re.search(pattern, body, re.MULTILINE)
-            if match:
-                signature = match.group(1)
-                break
+        signature_match = re.search(self.signature_pattern, body, re.MULTILINE)
+        if not signature_match:
+            return None
         
-        if not signature:
-            return result
-        
-        # 署名から情報を抽出
-        # 名前を抽出（通常は署名の最初の行）
+        signature = signature_match.group(1)
         lines = signature.strip().split('\n')
-        if lines:
-            result['name'] = lines[0].strip()
         
-        # 会社名を抽出（よくある形式: 株式会社XXX、XXX株式会社、XXX Co., Ltd.など）
+        # 会社名を抽出（よくある形式のみ）
         company_patterns = [
             r'(株式会社\S+)',
             r'(\S+株式会社)',
@@ -93,26 +84,6 @@ class NameExtractor:
             for pattern in company_patterns:
                 match = re.search(pattern, line)
                 if match:
-                    result['company'] = match.group(1)
-                    break
-            
-            # 部署名・役職を抽出
-            dept_patterns = [
-                r'(部長|課長|マネージャー|リーダー|ディレクター|エンジニア)',
-                r'(Department|Division|Team)',
-            ]
-            
-            for pattern in dept_patterns:
-                match = re.search(pattern, line)
-                if match:
-                    if '部' in line or 'Department' in line or 'Division' in line:
-                        result['department'] = line.strip()
-                    else:
-                        result['title'] = line.strip()
-            
-            # 電話番号を抽出
-            phone_match = re.search(r'(?:Tel|TEL|電話)[:：]?\s*(\+?[\d\-\(\)\s]+)', line)
-            if phone_match:
-                result['phone'] = phone_match.group(1).strip()
+                    return match.group(1)
         
-        return result
+        return None

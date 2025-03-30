@@ -24,17 +24,31 @@ CALENDAR_CREDENTIALS_FILE = config_dir / os.getenv("CALENDAR_CREDENTIALS_FILE")
 CALENDAR_TOKEN_FILE = config_dir / os.getenv("CALENDAR_TOKEN_FILE")
 CALENDAR_SCOPES = os.getenv("CALENDAR_SCOPES").split(",")
 
-# データベース設定
-DATABASE_URL = os.getenv("DATABASE_URL")
+# JSONファイル設定
+DATA_DIR = config_dir / "data"
+os.makedirs(DATA_DIR, exist_ok=True)
+
+# 名前データベースファイル
+NAME_DATABASE_FILE = DATA_DIR / "name_database.json"
 
 # メールとチャンネルのマッピング
-EMAIL_CHANNEL_MAPPING_FILE = config_dir / os.getenv("EMAIL_CHANNEL_MAPPING_FILE")
+EMAIL_CHANNEL_MAPPING_FILE = config_dir / os.getenv("EMAIL_CHANNEL_MAPPING_FILE", "email_channel_mapping.json")
 
 def get_email_channel_mapping():
     """メールアドレスとDiscordチャンネルのマッピングを取得"""
     try:
-        with open(EMAIL_CHANNEL_MAPPING_FILE, 'r') as f:
+        with open(EMAIL_CHANNEL_MAPPING_FILE, 'r', encoding='utf-8') as f:
             return json.load(f)
     except FileNotFoundError:
         # デフォルトの空のマッピングを返す
         return {}
+
+def save_email_channel_mapping(mapping):
+    """メールアドレスとDiscordチャンネルのマッピングを保存"""
+    try:
+        with open(EMAIL_CHANNEL_MAPPING_FILE, 'w', encoding='utf-8') as f:
+            json.dump(mapping, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception as e:
+        print(f"マッピング保存エラー: {e}")
+        return False

@@ -3,12 +3,13 @@ import os
 from pathlib import Path
 from ..utils.logger import setup_logger
 from .name_extractor import NameExtractor
+from ..config import config
 
 logger = setup_logger(__name__)
 
 class NameManager:
     def __init__(self, db_file=None):
-        self.db_file = db_file or Path(__file__).parent.parent / 'config' / 'name_database.json'
+        self.db_file = db_file or config.NAME_DATABASE_FILE
         self.name_db = self._load_database()
         self.extractor = NameExtractor()
     
