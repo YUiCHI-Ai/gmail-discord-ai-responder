@@ -105,6 +105,36 @@ pip install -r requirements.txt
 7. ダウンロードボタンをクリックして認証情報（credentials.json）をダウンロード
 8. ダウンロードしたファイルを`gmail_discord_bot/config/`ディレクトリに配置
 
+#### Gmail API認証の詳細手順
+
+このプロジェクトでは、Gmail APIを使用するための認証を簡単に行うためのスクリプトを用意しています。以下の手順に従って設定を完了させてください。
+
+1. **認証情報ファイルの配置**
+   - ダウンロードしたJSONファイルの名前を「credentials.json」に変更します
+   - このファイルを `gmail_discord_bot/config/` ディレクトリに配置します
+
+2. **アクセストークンの取得**
+   - 以下のコマンドを実行して、Gmail APIのアクセストークンを取得します：
+   ```bash
+   python gmail_discord_bot/get_gmail_token.py
+   ```
+   - ブラウザが開き、Googleアカウントへのログインと権限の承認を求められます
+   - 承認すると、`token.json` ファイルが `gmail_discord_bot/config/` ディレクトリに生成されます
+
+3. **Gmail APIのテスト**
+   - 以下のコマンドを実行して、APIが正しく設定されているか確認します：
+   ```bash
+   python gmail_discord_bot/test_gmail_api.py
+   ```
+   - このスクリプトは、Gmailのラベル一覧と最近のメール（最大5件）を表示します
+   - 正常に動作すれば、Gmail APIの設定は完了です
+
+4. **注意事項**
+   - OAuth同意画面で「外部」を選択した場合、アプリは「テスト」モードになります
+   - テストモードでは、明示的に追加したテストユーザーのみがアプリを使用できます
+   - 個人的な使用やテスト目的であれば、「テスト」モードでも問題ありません
+   - 実際の運用環境では、アプリを「本番」モードに移行する必要がありますが、そのためにはGoogleの審査が必要です
+
 ### Discord API設定
 
 1. [Discord Developer Portal](https://discord.com/developers/applications)にアクセス
