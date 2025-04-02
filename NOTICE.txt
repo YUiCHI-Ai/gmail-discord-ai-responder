@@ -1,0 +1,13 @@
+Gmail-Discord自動転送・返信システム
+Copyright 2025 YUiCHI
+
+このプロジェクトには、Apache License 2.0の下でライセンスされたソフトウェアが含まれています。
+
+このプロジェクトで使用されている主要な依存関係：
+- Google API Client Library for Python
+- Discord.py
+- OpenAI API
+- Anthropic API
+- その他のPythonライブラリ（requirements.txtを参照）
+
+各ライブラリの著作権およびライセンス情報については、それぞれのプロジェクトのライセンス文書を参照してください。
