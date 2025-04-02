@@ -2,7 +2,7 @@
 
 [ざっくり説明書はこちら](https://claude.site/artifacts/a7cb17a6-755a-40e7-9856-a3190ded2948)
 
-GmailからDiscordへのメール自動転送と、ChatGPT APIを活用した返信生成システム。送信元情報から適切な宛名（〇〇会社 〇〇様）を自動設定し、日程調整メールの場合はGoogleカレンダーと連携した候補日時の提案も行います。
+GmailからDiscordへのメール自動転送と、ChatGPTまたはClaude APIを活用した返信生成システム。送信元情報から適切な宛名（〇〇会社 〇〇様）を自動設定し、日程調整メールの場合はGoogleカレンダーと連携した候補日時の提案も行います。
 
 ## 目次
 
@@ -14,6 +14,7 @@ GmailからDiscordへのメール自動転送と、ChatGPT APIを活用した返
    - [Gmail API設定](#gmail-api設定)
    - [Discord API設定](#discord-api設定)
    - [OpenAI API設定](#openai-api設定)
+   - [Claude API設定](#claude-api設定)
    - [Googleカレンダー API設定](#googleカレンダー-api設定)
 6. [設定ファイルの作成](#設定ファイルの作成)
    - [環境変数の設定](#環境変数の設定)
@@ -32,7 +33,7 @@ GmailからDiscordへのメール自動転送と、ChatGPT APIを活用した返
 
 - **メール自動転送**: Gmailで受信したメールを送信元のメールアドレスごとに対応するDiscordチャンネルへ自動転送
 - **宛名自動設定**: 送信元情報から会社名・担当者名を抽出し、「〇〇会社 〇〇様」の形式で自動設定
-- **返信生成**: ChatGPT APIを活用してビジネスメール形式の返信を生成
+- **返信生成**: ChatGPTまたはClaude APIを活用してビジネスメール形式の返信を生成
 - **日程調整機能**: 日程調整に関するメールの場合、GoogleカレンダーAPIと連携し、実際のスケジュール確認を行った上で適切な返信文（候補日時を含む）を自動生成
 
 ## システム要件
@@ -40,7 +41,7 @@ GmailからDiscordへのメール自動転送と、ChatGPT APIを活用した返
 - Python 3.8以上
 - pip（Pythonパッケージマネージャー）
 - インターネット接続
-- Gmail、Discord、OpenAI、Googleカレンダーの各アカウント
+- Gmail、Discord、OpenAI/Anthropic、Googleカレンダーの各アカウント
 
 ## インストール手順
 
@@ -78,11 +79,12 @@ pip install -r requirements.txt
 |-------|------------|--------------|------------|----------|------|
 | **Gmail API** | あり | 1日あたり約1,000,000リクエスト | Google Workspaceの一部として提供 | Google Workspaceの料金プランに依存 | 個人利用の場合は通常無料枠で十分 |
 | **Discord API** | あり | ボット作成と基本機能は無料 | なし | なし | サーバーブーストなどの別機能に課金要素あり |
-| **OpenAI API (ChatGPT)** | なし | なし | 従量課金制 | モデルとトークン数に基づく従量課金<br>例：GPT-4は入力$0.01/1Kトークン、<br>出力$0.03/1Kトークン | 最も費用がかかる可能性のあるAPI |
+| **OpenAI API (ChatGPT)** | なし | なし | 従量課金制 | モデルとトークン数に基づく従量課金<br>例：GPT-4は入力$0.01/1Kトークン、<br>出力$0.03/1Kトークン | 費用がかかる可能性のあるAPI |
+| **Anthropic API (Claude)** | なし | なし | 従量課金制 | モデルとトークン数に基づく従量課金<br>例：Claude 3.5 Sonnetは入力$3/1Mトークン、<br>出力$15/1Mトークン | 費用がかかる可能性のあるAPI |
 | **Google Calendar API** | あり | 1日あたり約1,000,000リクエスト | Google Workspaceの一部として提供 | Google Workspaceの料金プランに依存 | 個人利用の場合は通常無料枠で十分 |
 
 **注意事項**:
-- OpenAI APIは無料枠がないため、使用量に応じた費用が発生します
+- OpenAIとAnthropic APIは無料枠がないため、使用量に応じた費用が発生します
 - 料金プランは変更される可能性があるため、各サービスの公式サイトで最新情報を確認してください
 - 使用量が多い場合は、レート制限やコスト管理の仕組みを実装することをお勧めします
 
@@ -166,6 +168,13 @@ pip install -r requirements.txt
 3. 「Create new secret key」をクリックし、新しいAPIキーを生成
 4. 生成されたAPIキーをコピー（このキーは後で`.env`ファイルに設定）
 
+### Claude API設定
+
+1. [Anthropicのウェブサイト](https://console.anthropic.com/)にアクセスし、アカウントを作成またはログイン
+2. 「API Keys」セクションに移動
+3. 「Create API Key」をクリックし、新しいAPIキーを生成
+4. 生成されたAPIキーをコピー（このキーは後で`.env`ファイルに設定）
+
 ### Googleカレンダー API設定
 
 1. [Google Cloud Console](https://console.cloud.google.com/)で、Gmail APIを設定したのと同じプロジェクトを使用
@@ -200,8 +209,10 @@ GMAIL_SCOPES=https://www.googleapis.com/auth/gmail.readonly,https://www.googleap
 DISCORD_BOT_TOKEN=your_discord_bot_token
 DISCORD_GUILD_ID=your_discord_guild_id
 
-# OpenAI API
+# AI API設定
 OPENAI_API_KEY=your_openai_api_key
+CLAUDE_API_KEY=your_claude_api_key
+DEFAULT_AI_PROVIDER=chatgpt  # 'chatgpt' または 'claude'
 
 # Google Calendar API
 CALENDAR_CREDENTIALS_FILE=calendar_credentials.json
@@ -215,6 +226,8 @@ EMAIL_CHANNEL_MAPPING_FILE=email_channel_mapping.json
 - `your_discord_bot_token`: Discord Developer Portalで取得したボットトークン
 - `your_discord_guild_id`: ボットを追加したDiscordサーバーのID
 - `your_openai_api_key`: OpenAIで生成したAPIキー
+- `your_claude_api_key`: Anthropicで生成したAPIキー
+- `DEFAULT_AI_PROVIDER`: 使用するAIプロバイダー（`chatgpt`または`claude`）
 
 ### メールとチャンネルのマッピング
 
@@ -272,7 +285,7 @@ flowchart TD
     E -->|はい| F[Googleカレンダーから\nスケジュール取得]
     E -->|いいえ| G[通常の返信プロンプト生成]
     F --> H[日程調整用プロンプト生成]
-    G --> I[ChatGPT APIで返信生成]
+    G --> I[AI APIで返信生成]
     H --> I
     I --> J[Discordに返信を表示]
     J --> L{編集が必要?}
@@ -305,6 +318,13 @@ gmail_discord_bot/
 │   ├── __init__.py
 │   ├── prompt_generator.py      # プロンプト生成
 │   └── response_processor.py    # 応答処理
+├── claude_module/               # Claude連携を担当
+│   ├── __init__.py
+│   ├── prompt_generator.py      # プロンプト生成
+│   └── response_processor.py    # 応答処理
+├── ai_module/                   # AI共通モジュール
+│   ├── __init__.py
+│   └── ai_factory.py            # AIプロバイダーファクトリー
 ├── calendar_module/             # Googleカレンダー連携を担当
 │   ├── __init__.py
 │   ├── calendar_client.py       # カレンダーAPIクライアント
@@ -324,6 +344,7 @@ gmail_discord_bot/
     ├── test_discord.py
     ├── test_name.py
     ├── test_chatgpt.py
+    ├── test_claude.py
     ├── test_calendar.py
     └── test_integration.py
 ```
@@ -355,10 +376,11 @@ gmail_discord_bot/
 **問題**: メールは転送されるが、返信が生成されない
 
 **解決策**:
-1. OpenAI APIキーが正しく設定されているか確認
-2. OpenAI APIの使用制限に達していないか確認
+1. OpenAIまたはClaude APIキーが正しく設定されているか確認
+2. APIの使用制限に達していないか確認
 3. ログファイルでエラーメッセージを確認
 4. インターネット接続を確認
+5. `.env`ファイルの`DEFAULT_AI_PROVIDER`が正しく設定されているか確認
 
 ### Discordボットが応答しない
 
@@ -386,7 +408,7 @@ A: 未処理のメールがある場合は、システム復旧後に処理キ�
 
 ### Q: APIの使用制限にはどう対応しますか？
 
-A: 各APIの使用制限を監視し、制限に近づいた場合はレート制限を設けています。特にChatGPT APIやGmail APIの利用量が多い場合は、処理の優先順位付けや一時的な機能制限などの対策が必要です。
+A: 各APIの使用制限を監視し、制限に近づいた場合はレート制限を設けています。特にAI APIやGmail APIの利用量が多い場合は、処理の優先順位付けや一時的な機能制限などの対策が必要です。
 
 ### Q: 宛名情報の学習はどのように行われますか？
 
@@ -395,6 +417,10 @@ A: 一度やり取りしたメールアドレスと対応する会社名・担�
 ### Q: 宛名情報の更新はどうしますか？
 
 A: 同じメールアドレスでも担当者が変わる場合があるため、最新のメールに含まれる署名情報を優先的に使用します。また、コマンドからいつでも手動で情報を更新できる仕組みも用意しています。
+
+### Q: ChatGPTとClaudeのどちらを使うべきですか？
+
+A: 用途や予算に応じて選択できます。ChatGPTは一般的なタスクに優れており、Claudeは長文の理解や丁寧な応答が特徴です。`.env`ファイルの`DEFAULT_AI_PROVIDER`設定で切り替えられます。
 
 ## ライセンス
 

@@ -9,23 +9,27 @@ from gmail_discord_bot.gmail_module.email_processor import EmailProcessor
 from gmail_discord_bot.discord_module.discord_bot import DiscordBot
 from gmail_discord_bot.discord_module.message_formatter import MessageFormatter
 from gmail_discord_bot.name_module.name_manager import NameManager
-from gmail_discord_bot.chatgpt_module.prompt_generator import PromptGenerator
-from gmail_discord_bot.chatgpt_module.response_processor import ResponseProcessor
+from gmail_discord_bot.ai_module.ai_factory import AIFactory
 from gmail_discord_bot.calendar_module.schedule_analyzer import ScheduleAnalyzer
 from gmail_discord_bot.utils.logger import setup_logger
+from gmail_discord_bot.config import config
 
 logger = setup_logger(__name__)
 
 class EmailBot:
-    def __init__(self):
+    def __init__(self, ai_provider=None):
+        # AIプロバイダーの設定
+        self.ai_provider = ai_provider or config.DEFAULT_AI_PROVIDER
+        logger.info(f"AIプロバイダー '{self.ai_provider}' を使用します")
+        
         # 各モジュールの初期化
         self.gmail_client = GmailClient()
         self.email_processor = EmailProcessor(self.gmail_client)
         self.discord_bot = DiscordBot()
         self.message_formatter = MessageFormatter()
         self.name_manager = NameManager()
-        self.prompt_generator = PromptGenerator()
-        self.response_processor = ResponseProcessor()
+        self.prompt_generator = AIFactory.create_prompt_generator(self.ai_provider)
+        self.response_processor = AIFactory.create_response_processor(self.ai_provider)
         self.schedule_analyzer = ScheduleAnalyzer()
         
         # 処理中のメールIDを追跡

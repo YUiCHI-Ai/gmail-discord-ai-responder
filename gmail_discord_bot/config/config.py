@@ -16,8 +16,10 @@ GMAIL_SCOPES = os.getenv("GMAIL_SCOPES").split(",")
 DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 DISCORD_GUILD_ID = os.getenv("DISCORD_GUILD_ID")
 
-# OpenAI API設定
+# AI API設定
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY")
+DEFAULT_AI_PROVIDER = os.getenv("DEFAULT_AI_PROVIDER", "chatgpt")  # デフォルトはChatGPT
 
 # Google Calendar API設定
 CALENDAR_CREDENTIALS_FILE = config_dir / os.getenv("CALENDAR_CREDENTIALS_FILE")
