@@ -1,0 +1,6 @@
+{
+  "specific.user@example.com": "1234567890123456789",
+  "another.user@example.com": "9876543210987654321",
+  "*@example.com": "1122334455667788990",
+  "*@another-domain.com": "9988776655443322110"
+}
