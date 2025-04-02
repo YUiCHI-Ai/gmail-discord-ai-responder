@@ -105,6 +105,9 @@ pip install -r requirements.txt
 7. ダウンロードボタンをクリックして認証情報（credentials.json）をダウンロード
 8. ダウンロードしたファイルを`gmail_discord_bot/config/`ディレクトリに配置
 
+9. **参考動画**: Gmail APIの設定方法については、以下の動画も参考にしてください：
+   - [Gmail API設定解説動画](https://m.youtube.com/watch?v=TXvFaTn5lck&pp=ygUJZ21haWwgYXBp)
+
 #### Gmail API認証の詳細手順
 
 このプロジェクトでは、Gmail APIを使用するための認証を簡単に行うためのスクリプトを用意しています。以下の手順に従って設定を完了させてください。
