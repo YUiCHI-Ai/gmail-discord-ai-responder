@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands
 import asyncio
+from async_timeout import timeout as async_timeout
 from ..config import config
 from ..utils.logger import setup_logger
 
@@ -66,53 +67,84 @@ class DiscordBot:
     
     async def send_email_notification(self, channel_id, email_data):
         """メール通知をDiscordチャンネルに送信"""
-        channel = self.bot.get_channel(int(channel_id))
-        if not channel:
-            logger.error(f"チャンネルが見つかりません: {channel_id}")
+        logger.info(f"send_email_notification: チャンネルID {channel_id} へメール通知を送信開始")
+        try:
+            channel = self.bot.get_channel(int(channel_id))
+            if not channel:
+                logger.error(f"チャンネルが見つかりません: {channel_id}")
+                return False
+            
+            logger.info(f"チャンネル {channel.name} が見つかりました")
+            
+            # メール情報を整形
+            embed = discord.Embed(
+                title=f"新しいメール: {email_data['subject']}",
+                color=discord.Color.blue()
+            )
+            embed.add_field(name="送信者", value=email_data['sender'], inline=False)
+            embed.add_field(name="日時", value=email_data['date'], inline=False)
+            
+            # 本文が長い場合は省略
+            body = email_data['body']
+            if len(body) > 1000:
+                body = body[:997] + "..."
+            
+            embed.add_field(name="本文", value=body, inline=False)
+            
+            # タイムアウト処理を追加
+            async with async_timeout(10):  # 10秒のタイムアウト
+                logger.info("embedメッセージを送信中...")
+                await channel.send(embed=embed)
+                logger.info("返信候補生成メッセージを送信中...")
+                await channel.send("返信候補を生成中...")
+            
+            logger.info(f"チャンネル {channel_id} へのメール通知送信完了")
+            return True
+        except asyncio.TimeoutError:
+            logger.error(f"チャンネル {channel_id} へのメッセージ送信がタイムアウトしました")
             return False
-        
-        # メール情報を整形
-        embed = discord.Embed(
-            title=f"新しいメール: {email_data['subject']}",
-            color=discord.Color.blue()
-        )
-        embed.add_field(name="送信者", value=email_data['sender'], inline=False)
-        embed.add_field(name="日時", value=email_data['date'], inline=False)
-        
-        # 本文が長い場合は省略
-        body = email_data['body']
-        if len(body) > 1000:
-            body = body[:997] + "..."
-        
-        embed.add_field(name="本文", value=body, inline=False)
-        
-        await channel.send(embed=embed)
-        await channel.send("返信候補を生成中...")
-        
-        return True
+        except Exception as e:
+            logger.error(f"メール通知送信エラー: {e}")
+            return False
     
     async def send_response_options(self, channel_id, email_data, response_options):
         """返信候補をDiscordチャンネルに送信"""
-        channel = self.bot.get_channel(int(channel_id))
-        if not channel:
-            logger.error(f"チャンネルが見つかりません: {channel_id}")
+        logger.info(f"send_response_options: チャンネルID {channel_id} へ返信候補を送信開始")
+        try:
+            channel = self.bot.get_channel(int(channel_id))
+            if not channel:
+                logger.error(f"チャンネルが見つかりません: {channel_id}")
+                return False
+            
+            logger.info(f"チャンネル {channel.name} が見つかりました")
+            
+            # タイムアウト処理を追加
+            async with async_timeout(30):  # 30秒のタイムアウト（複数のメッセージを送信するため長めに設定）
+                logger.info("返信候補生成完了メッセージを送信中...")
+                await channel.send("**返信候補が生成されました**\n以下から選択するか、編集してください：")
+                
+                # 返信候補を保存
+                self.response_options[str(channel_id)] = {
+                    'email': email_data,
+                    'options': response_options,
+                    'selected': None
+                }
+                
+                # 各候補を表示
+                logger.info(f"{len(response_options)}個の返信候補を送信中...")
+                for i, option in enumerate(response_options, 1):
+                    await channel.send(f"**候補 {i}**\n```\n{option}\n```")
+                
+                await channel.send("選択するには `!select [番号]` を使用してください。")
+            
+            logger.info(f"チャンネル {channel_id} への返信候補送信完了")
+            return True
+        except asyncio.TimeoutError:
+            logger.error(f"チャンネル {channel_id} への返信候補送信がタイムアウトしました")
             return False
-        
-        await channel.send("**返信候補が生成されました**\n以下から選択するか、編集してください：")
-        
-        # 返信候補を保存
-        self.response_options[str(channel_id)] = {
-            'email': email_data,
-            'options': response_options,
-            'selected': None
-        }
-        
-        # 各候補を表示
-        for i, option in enumerate(response_options, 1):
-            await channel.send(f"**候補 {i}**\n```\n{option}\n```")
-        
-        await channel.send("選択するには `!select [番号]` を使用してください。")
-        return True
+        except Exception as e:
+            logger.error(f"返信候補送信エラー: {e}")
+            return False
     
     def run(self):
         """ボットを実行"""

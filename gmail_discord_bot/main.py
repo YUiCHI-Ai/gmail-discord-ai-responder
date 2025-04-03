@@ -17,6 +17,7 @@ import time
 import threading
 from pathlib import Path
 import logging
+from async_timeout import timeout as async_timeout
 
 from gmail_discord_bot.gmail_module.gmail_client import GmailClient
 from gmail_discord_bot.gmail_module.email_processor import EmailProcessor
@@ -61,6 +62,7 @@ class EmailBot:
                 logger.info(f"メール {email_data['id']} は既に処理中です")
                 return
             
+            logger.info(f"メール {email_data['id']} の処理を開始します")
             self.processing_emails.add(email_data['id'])
             
             try:
@@ -71,18 +73,32 @@ class EmailBot:
                 logger.log_flow(FlowStep.EXTRACT_ADDRESS, "送信者情報から宛名を抽出")
                 sender_info = self.name_manager.process_email(email_data)
                 sender_email = sender_info['email']
+                logger.info(f"送信者メールアドレス: {sender_email}")
                 
                 # 宛名を生成
                 address = self.name_manager.format_address(sender_email)
+                logger.info(f"生成された宛名: {address}")
                 
                 # Discordチャンネルにメール通知を送信
                 logger.log_flow(FlowStep.TRANSFER_TO_DISCORD, "Discordチャンネルへメールを転送")
                 channel_id = email_data['discord_channel_id']
-                await self.discord_bot.send_email_notification(channel_id, email_data)
+                logger.info(f"送信先チャンネルID: {channel_id}")
+                
+                # タイムアウト処理を追加
+                try:
+                    async with async_timeout(15):  # 15秒のタイムアウト
+                        success = await self.discord_bot.send_email_notification(channel_id, email_data)
+                        if not success:
+                            logger.error(f"メール通知の送信に失敗しました: チャンネルID {channel_id}")
+                            return
+                except asyncio.TimeoutError:
+                    logger.error(f"メール通知の送信がタイムアウトしました: チャンネルID {channel_id}")
+                    return
                 
                 # 日程調整関連のメールかどうかを判定
                 logger.log_flow(FlowStep.CHECK_SCHEDULE, "日程調整関連のメールか判定")
                 is_schedule = self.prompt_generator.is_schedule_related(email_data)
+                logger.info(f"日程調整関連のメール: {is_schedule}")
                 
                 # プロンプトを生成
                 if is_schedule:
@@ -102,19 +118,36 @@ class EmailBot:
                 
                 # 返信候補を生成
                 logger.log_flow(FlowStep.GENERATE_RESPONSE, "AI APIで返信を生成")
-                responses = await self.response_processor.generate_responses(prompt)
+                try:
+                    async with async_timeout(60):  # 60秒のタイムアウト（AI生成は時間がかかる可能性がある）
+                        responses = await self.response_processor.generate_responses(prompt)
+                except asyncio.TimeoutError:
+                    logger.error("AI応答生成がタイムアウトしました")
+                    return
                 
                 # 返信候補をDiscordに送信
                 logger.log_flow(FlowStep.DISPLAY_RESPONSE, "Discordに返信を表示")
-                await self.discord_bot.send_response_options(channel_id, email_data, responses)
+                try:
+                    async with async_timeout(30):  # 30秒のタイムアウト
+                        success = await self.discord_bot.send_response_options(channel_id, email_data, responses)
+                        if not success:
+                            logger.error(f"返信候補の送信に失敗しました: チャンネルID {channel_id}")
+                            return
+                except asyncio.TimeoutError:
+                    logger.error(f"返信候補の送信がタイムアウトしました: チャンネルID {channel_id}")
+                    return
                 
                 logger.log_flow(FlowStep.COMPLETE, f"メール {email_data['id']} の処理を完了")
             finally:
                 # 処理完了したメールをトラッキングから削除
-                self.processing_emails.remove(email_data['id'])
+                if email_data['id'] in self.processing_emails:
+                    self.processing_emails.remove(email_data['id'])
+                    logger.info(f"メール {email_data['id']} の処理を完了し、トラッキングから削除しました")
             
         except Exception as e:
             logger.error(f"メール処理エラー: {e}")
+            import traceback
+            logger.error(f"詳細なエラー情報: {traceback.format_exc()}")
             if email_data['id'] in self.processing_emails:
                 self.processing_emails.remove(email_data['id'])
     
@@ -143,28 +176,48 @@ class EmailBot:
             await self.check_emails()
             await asyncio.sleep(self.check_interval)
     
-    def start_periodic_check(self):
-        """非同期の定期チェックを開始"""
+    async def start_bot_and_check(self):
+        """DiscordボットとメールチェックをまとめてAsync実行"""
+        logger.info("Discordボットを非同期モードで起動します")
+        
+        # Discordボットを非同期で起動
+        bot_task = asyncio.create_task(self.discord_bot.bot.start(self.discord_bot.token))
+        
+        # 少し待ってからメールチェックを開始（ボットの起動を待つ）
+        await asyncio.sleep(5)
+        
+        # 定期チェックを開始
+        logger.info("メールの定期チェックを開始します")
+        check_task = asyncio.create_task(self.periodic_check())
+        
+        # 両方のタスクが完了するまで待機
+        try:
+            await asyncio.gather(bot_task, check_task)
+        except asyncio.CancelledError:
+            logger.info("タスクがキャンセルされました")
+        except Exception as e:
+            logger.error(f"タスク実行中にエラーが発生しました: {e}")
+            import traceback
+            logger.error(f"詳細なエラー情報: {traceback.format_exc()}")
+    
+    def run(self):
+        """ボットを実行"""
+        logger.info("アプリケーションを起動します")
+        
+        # 単一のイベントループでDiscordボットとメールチェックを実行
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         
         try:
-            loop.run_until_complete(self.periodic_check())
+            loop.run_until_complete(self.start_bot_and_check())
         except KeyboardInterrupt:
-            logger.info("定期チェックを停止します")
+            logger.info("アプリケーションを停止します")
+            # Discordボットを停止
+            if hasattr(loop, 'is_running') and loop.is_running():
+                asyncio.create_task(self.discord_bot.bot.close())
         finally:
             loop.close()
-    
-    def run(self):
-        """ボットを実行"""
-        # 定期チェックを別スレッドで開始
-        check_thread = threading.Thread(target=self.start_periodic_check)
-        check_thread.daemon = True
-        check_thread.start()
-        
-        # Discordボットを実行
-        logger.info("Discordボットを起動します")
-        self.discord_bot.run()
+            logger.info("イベントループを閉じました")
 
 if __name__ == "__main__":
     logger.log_flow(FlowStep.RECEIVE_EMAIL, "アプリケーションを起動")
