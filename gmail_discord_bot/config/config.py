@@ -20,6 +20,8 @@ DISCORD_GUILD_ID = os.getenv("DISCORD_GUILD_ID")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY")
 DEFAULT_AI_PROVIDER = os.getenv("DEFAULT_AI_PROVIDER", "chatgpt")  # デフォルトはChatGPT
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4")  # デフォルトはGPT-4
+CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-3-sonnet-20240229")  # デフォルトはClaude 3 Sonnet
 
 # システムプロンプト設定
 SYSTEM_PROMPTS_FILE = config_dir / "system_prompts.json"

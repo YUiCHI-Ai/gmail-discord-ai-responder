@@ -10,7 +10,7 @@ class ClaudeResponseProcessor:
     def __init__(self):
         self.client = anthropic.Anthropic(api_key=config.CLAUDE_API_KEY)
         self.async_client = anthropic.AsyncAnthropic(api_key=config.CLAUDE_API_KEY)
-        self.model = "claude-3-sonnet-20240229"  # デフォルトモデル
+        self.model = config.CLAUDE_MODEL  # .envファイルで設定されたモデル
     
     async def generate_responses(self, prompt, num_responses=3):
         """Claude APIを使用して返信を生成"""

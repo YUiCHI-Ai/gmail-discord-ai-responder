@@ -16,7 +16,7 @@ class ResponseProcessor:
             system_prompt = config.get_system_prompt()
             
             response = openai.ChatCompletion.create(
-                model="gpt-4",  # または利用可能な最新モデル
+                model=config.OPENAI_MODEL,  # .envファイルで設定されたモデル
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt}
