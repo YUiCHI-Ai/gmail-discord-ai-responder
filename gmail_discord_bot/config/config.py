@@ -87,7 +87,4 @@ def get_email_responder_prompt():
         # エラー時のフォールバック
         return "あなたはメール返信アシスタント「メール返信くん」です。適切な返信を作成してください。"
 
-# 後方互換性のために残す
-def get_system_prompt():
-    """共通のシステムプロンプトを取得（後方互換性用）"""
-    return get_email_analyzer_prompt()
+# 後方互換性のための関数は不要になりました

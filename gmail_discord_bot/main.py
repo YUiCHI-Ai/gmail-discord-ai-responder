@@ -43,7 +43,6 @@ class EmailBot:
         self.discord_bot = DiscordBot()
         self.message_formatter = MessageFormatter()
         self.name_manager = NameManager()
-        self.prompt_generator = AIFactory.create_prompt_generator(self.ai_provider)
         self.response_processor = AIFactory.create_response_processor(self.ai_provider)
         self.schedule_analyzer = ScheduleAnalyzer()
         

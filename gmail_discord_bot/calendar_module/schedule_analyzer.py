@@ -119,8 +119,4 @@ class ScheduleAnalyzer:
                 f"{(now + datetime.timedelta(days=i+1)).strftime('%Y年%m月%d日')}の午前"
             ]
     
-    def analyze_email_for_dates(self, email_body):
-        """メール本文から日付に関する情報を抽出"""
-        # 実装例：正規表現で日付を抽出する
-        # この部分は必要に応じて拡張可能
-        return []
+    # 未使用のメソッドを削除
