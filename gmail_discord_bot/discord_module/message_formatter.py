@@ -12,7 +12,18 @@ class MessageFormatter:
         # 基本情報
         formatted = f"**新しいメール**\n"
         formatted += f"**件名:** {email_data['subject']}\n"
-        formatted += f"**送信者:** {email_data['sender']}\n"
+        
+        # 送信者情報を表示（会社名と名前を含む）
+        sender_display = email_data['sender']
+        if 'sender_name' in email_data and email_data['sender_name']:
+            if 'sender_company' in email_data and email_data['sender_company']:
+                sender_display = f"{email_data['sender']} ({email_data['sender_company']} {email_data['sender_name']})"
+            else:
+                sender_display = f"{email_data['sender']} ({email_data['sender_name']})"
+        elif 'sender_company' in email_data and email_data['sender_company']:
+            sender_display = f"{email_data['sender']} ({email_data['sender_company']})"
+        
+        formatted += f"**送信者:** {sender_display}\n"
         formatted += f"**日時:** {email_data['date']}\n\n"
         
         # 本文（長すぎる場合は分割）

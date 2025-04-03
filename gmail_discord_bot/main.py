@@ -86,6 +86,11 @@ class EmailBot:
                 address = self.name_manager.format_address(sender_email)
                 logger.info(f"生成された宛名: {address}")
                 
+                # 送信者情報をemail_dataに追加
+                email_data['sender_name'] = sender_info.get('name', '')
+                email_data['sender_company'] = sender_info.get('company', '')
+                logger.info(f"送信者名: {email_data['sender_name']}, 会社名: {email_data['sender_company']}")
+                
                 # Discordチャンネルにメール通知を送信
                 logger.log_flow(FlowStep.TRANSFER_TO_DISCORD, "Discordチャンネルへメールを転送")
                 channel_id = email_data['discord_channel_id']

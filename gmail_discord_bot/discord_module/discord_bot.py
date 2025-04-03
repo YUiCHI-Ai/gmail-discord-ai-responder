@@ -101,7 +101,18 @@ class DiscordBot:
                 title=f"新しいメール: {email_data['subject']}",
                 color=discord.Color.blue()
             )
-            embed.add_field(name="送信者", value=email_data['sender'], inline=False)
+            
+            # 送信者情報を表示（会社名と名前を含む）
+            sender_display = email_data['sender']
+            if 'sender_name' in email_data and email_data['sender_name']:
+                if 'sender_company' in email_data and email_data['sender_company']:
+                    sender_display = f"{email_data['sender']} ({email_data['sender_company']} {email_data['sender_name']})"
+                else:
+                    sender_display = f"{email_data['sender']} ({email_data['sender_name']})"
+            elif 'sender_company' in email_data and email_data['sender_company']:
+                sender_display = f"{email_data['sender']} ({email_data['sender_company']})"
+            
+            embed.add_field(name="送信者", value=sender_display, inline=False)
             embed.add_field(name="日時", value=email_data['date'], inline=False)
             
             # 本文が長い場合は省略
