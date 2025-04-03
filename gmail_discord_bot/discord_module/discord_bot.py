@@ -43,8 +43,28 @@ class DiscordBot:
             `!select [番号]` - 提案された返信から選択（番号は1から始まる）
             `!edit [番号] [新しい内容]` - 提案された返信を編集
             `!send [番号]` - 選択した返信を実際にメールとして送信
+            `!approve [メールID]` - 承認リクエストを承認
+            `!reject [メールID]` - 承認リクエストを拒否
+            `!handle [メールID] [番号または対処法]` - その他情報リクエストに対処
             """
             await ctx.send(help_text)
+            
+        @self.bot.command(name='approve')
+        async def approve_request(ctx, email_id: str):
+            """承認リクエストを承認"""
+            await ctx.send(f"メール {email_id} を承認しました。返信を生成します...")
+            # ここで承認後の処理を実装（返信生成など）
+            
+        @self.bot.command(name='reject')
+        async def reject_request(ctx, email_id: str):
+            """承認リクエストを拒否"""
+            await ctx.send(f"メール {email_id} を拒否しました。")
+            
+        @self.bot.command(name='handle')
+        async def handle_other_info(ctx, email_id: str, *, action: str):
+            """その他情報リクエストに対処"""
+            await ctx.send(f"メール {email_id} に対して「{action}」の対処を行います。")
+            # ここで対処後の処理を実装
         
         @self.bot.command(name='select')
         async def select_response(ctx, option_number: int):
@@ -149,6 +169,103 @@ class DiscordBot:
     def run(self):
         """ボットを実行"""
         self.bot.run(self.token)
+    
+    async def send_message(self, channel_id, message):
+        """一般的なメッセージをDiscordチャンネルに送信"""
+        try:
+            channel = self.bot.get_channel(int(channel_id))
+            if not channel:
+                logger.error(f"チャンネルが見つかりません: {channel_id}")
+                return False
+            
+            await channel.send(message)
+            return True
+        except Exception as e:
+            logger.error(f"メッセージ送信エラー: {e}")
+            return False
+    
+    async def send_approval_request(self, channel_id, email_data, message):
+        """承認リクエストをDiscordチャンネルに送信"""
+        logger.info(f"send_approval_request: チャンネルID {channel_id} へ承認リクエストを送信開始")
+        try:
+            channel = self.bot.get_channel(int(channel_id))
+            if not channel:
+                logger.error(f"チャンネルが見つかりません: {channel_id}")
+                return False
+            
+            # 承認リクエスト用のEmbed作成
+            embed = discord.Embed(
+                title=f"承認リクエスト: {email_data['subject']}",
+                description=message,
+                color=discord.Color.orange()
+            )
+            
+            await channel.send(embed=embed)
+            logger.info(f"チャンネル {channel_id} への承認リクエスト送信完了")
+            return True
+        except Exception as e:
+            logger.error(f"承認リクエスト送信エラー: {e}")
+            return False
+    
+    async def send_attachments_and_urls(self, channel_id, email_data, attachments, urls):
+        """添付ファイルとURLをDiscordチャンネルに送信"""
+        logger.info(f"send_attachments_and_urls: チャンネルID {channel_id} へ添付ファイルとURLを送信開始")
+        try:
+            channel = self.bot.get_channel(int(channel_id))
+            if not channel:
+                logger.error(f"チャンネルが見つかりません: {channel_id}")
+                return False
+            
+            # 確認メッセージ
+            embed = discord.Embed(
+                title=f"確認リクエスト: {email_data['subject']}",
+                description="以下の添付ファイルとURLを確認してください。",
+                color=discord.Color.green()
+            )
+            
+            await channel.send(embed=embed)
+            
+            # 添付ファイルを送信
+            for attachment in attachments:
+                file = discord.File(
+                    fp=attachment['data'],
+                    filename=attachment['filename']
+                )
+                await channel.send(f"添付ファイル: {attachment['filename']} ({attachment['mime_type']})", file=file)
+            
+            # URLを送信
+            if urls:
+                url_message = "**メール内のURL:**\n" + "\n".join(urls)
+                await channel.send(url_message)
+            
+            logger.info(f"チャンネル {channel_id} への添付ファイルとURL送信完了")
+            return True
+        except Exception as e:
+            logger.error(f"添付ファイルとURL送信エラー: {e}")
+            return False
+    
+    async def send_other_info_request(self, channel_id, email_data, message):
+        """その他情報リクエストをDiscordチャンネルに送信"""
+        logger.info(f"send_other_info_request: チャンネルID {channel_id} へその他情報リクエストを送信開始")
+        try:
+            channel = self.bot.get_channel(int(channel_id))
+            if not channel:
+                logger.error(f"チャンネルが見つかりません: {channel_id}")
+                return False
+            
+            # その他情報リクエスト用のEmbed作成
+            embed = discord.Embed(
+                title=f"追加情報リクエスト: {email_data['subject']}",
+                description=message,
+                color=discord.Color.purple()
+            )
+            
+            await channel.send(embed=embed)
+            logger.info(f"チャンネル {channel_id} へのその他情報リクエスト送信完了")
+            return True
+        except Exception as e:
+            logger.error(f"その他情報リクエスト送信エラー: {e}")
+            return False
     
     def run_async(self):
         """非同期でボットを実行（テスト用）"""

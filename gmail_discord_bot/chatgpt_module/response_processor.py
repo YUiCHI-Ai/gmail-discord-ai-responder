@@ -3,6 +3,7 @@ import openai
 from ..config import config
 from ..utils.logger import setup_logger
 from ..calendar_module.schedule_analyzer import ScheduleAnalyzer
+from ..utils.output_saver import OutputSaver
 
 logger = setup_logger(__name__)
 
@@ -10,8 +11,9 @@ class ResponseProcessor:
     def __init__(self):
         openai.api_key = config.OPENAI_API_KEY
         self.schedule_analyzer = ScheduleAnalyzer()
+        self.output_saver = OutputSaver()  # LLM出力保存用
     
-    async def analyze_email(self, prompt):
+    async def analyze_email(self, prompt, email_id=None):
         """ChatGPT APIを使用してメールを分析"""
         try:
             # メール分析用のシステムプロンプトを取得
@@ -37,11 +39,27 @@ class ResponseProcessor:
             # 必要情報を抽出
             required_info = self._extract_required_info(analysis_text)
             
-            logger.info(f"メール分析完了: 必要情報タイプ={required_info.get('type', 'なし')}")
-            return {
+            # 結果を構造化
+            analysis_result = {
                 "analysis": analysis,
                 "required_info": required_info
             }
+            
+            # 結果をファイルに保存（メールIDがある場合のみ）
+            if email_id:
+                try:
+                    filepath = self.output_saver.save_analysis(
+                        email_id=email_id,
+                        analysis_text=analysis_text,
+                        analysis_result=analysis_result,
+                        provider="chatgpt"
+                    )
+                    logger.info(f"メール分析結果を保存しました: {filepath}")
+                except Exception as save_error:
+                    logger.error(f"メール分析結果の保存に失敗しました: {save_error}")
+            
+            logger.info(f"メール分析完了: 必要情報タイプ={required_info.get('type', 'なし')}")
+            return analysis_result
         
         except Exception as e:
             logger.error(f"メール分析API呼び出しエラー: {e}")
@@ -50,16 +68,19 @@ class ResponseProcessor:
                 "required_info": {"type": None}
             }
     
-    async def generate_responses(self, prompt, analysis_result=None, num_responses=1):
+    async def generate_responses(self, prompt, analysis_result=None, num_responses=1, email_id=None):
         """ChatGPT APIを使用して返信を生成"""
         try:
             # 追加情報の取得
-            additional_info = ""
+            additional_info = {}
+            additional_info_text = ""
+            
             if analysis_result and analysis_result.get("required_info", {}).get("type") == "カレンダー":
                 # カレンダー情報が必要な場合、利用可能なスロットを取得
                 available_slots = self.schedule_analyzer.get_available_slots()
                 slots_text = "\n".join([f"- {slot}" for slot in available_slots])
-                additional_info = f"\n\n# 利用可能な日時スロット\n以下の日時が空いています：\n{slots_text}"
+                additional_info_text = f"\n\n# 利用可能な日時スロット\n以下の日時が空いています：\n{slots_text}"
+                additional_info = {"type": "カレンダー", "available_slots": available_slots}
             
             # 返信生成用のシステムプロンプトを取得
             system_prompt = config.get_email_responder_prompt()
@@ -68,7 +89,7 @@ class ResponseProcessor:
             full_prompt = prompt
             if analysis_result:
                 analysis = analysis_result.get("analysis", "")
-                full_prompt = f"{prompt}\n\n# メール分析結果\n{analysis}{additional_info}"
+                full_prompt = f"{prompt}\n\n# メール分析結果\n{analysis}{additional_info_text}"
             
             response = openai.ChatCompletion.create(
                 model=config.OPENAI_MODEL,
@@ -86,6 +107,20 @@ class ResponseProcessor:
             
             # 返信を抽出
             responses = self._split_responses(response_text)
+            
+            # 結果をファイルに保存（メールIDがある場合のみ）
+            if email_id:
+                try:
+                    filepath = self.output_saver.save_responses(
+                        email_id=email_id,
+                        response_text=response_text,
+                        responses=responses,
+                        provider="chatgpt",
+                        additional_info=additional_info
+                    )
+                    logger.info(f"返信候補を保存しました: {filepath}")
+                except Exception as save_error:
+                    logger.error(f"返信候補の保存に失敗しました: {save_error}")
             
             logger.info(f"{len(responses)}件の返信候補を生成しました")
             return responses
@@ -108,11 +143,22 @@ class ResponseProcessor:
     
     def _extract_required_info(self, text):
         """必要情報を抽出"""
-        pattern = r'<必要情報>.*?<タイプ>(.*?)</タイプ>.*?</必要情報>'
-        match = re.search(pattern, text, re.DOTALL)
-        if match:
-            return {"type": match.group(1).strip()}
-        return {"type": None}
+        # タイプを抽出
+        type_pattern = r'<必要情報>.*?<タイプ>(.*?)</タイプ>.*?</必要情報>'
+        type_match = re.search(type_pattern, text, re.DOTALL)
+        
+        # 詳細情報を抽出（存在する場合）
+        details_pattern = r'<必要情報>.*?<詳細>(.*?)</詳細>.*?</必要情報>'
+        details_match = re.search(details_pattern, text, re.DOTALL)
+        
+        if type_match:
+            info_type = type_match.group(1).strip()
+            details = details_match.group(1).strip() if details_match else ""
+            return {
+                "type": info_type,
+                "details": details
+            }
+        return {"type": None, "details": ""}
     
     def _split_responses(self, response_text):
         """ChatGPTの応答から返信を抽出"""

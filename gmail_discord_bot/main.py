@@ -64,6 +64,14 @@ class EmailBot:
             logger.info(f"メール {email_data['id']} の処理を開始します")
             self.processing_emails.add(email_data['id'])
             
+            # 元のメール内容を保存
+            try:
+                output_saver = self.response_processor.output_saver
+                filepath = output_saver.save_email_content(email_data['id'], email_data)
+                logger.info(f"元のメール内容を保存しました: {filepath}")
+            except Exception as save_error:
+                logger.error(f"元のメール内容の保存に失敗しました: {save_error}")
+            
             try:
                 # 送信元アドレスの確認
                 logger.log_flow(FlowStep.CHECK_SENDER, f"メール {email_data['id']} の送信元を確認")
@@ -113,28 +121,120 @@ class EmailBot:
                 logger.log_flow(FlowStep.ANALYZE_EMAIL, "AIでメールを分析")
                 try:
                     async with async_timeout(30):  # 30秒のタイムアウト
-                        analysis_result = await self.response_processor.analyze_email(prompt)
+                        analysis_result = await self.response_processor.analyze_email(prompt, email_id=email_data['id'])
                 except asyncio.TimeoutError:
                     logger.error("メール分析がタイムアウトしました")
                     return
                 
                 # 必要情報の確認
                 required_info_type = analysis_result.get("required_info", {}).get("type")
+                required_info_details = analysis_result.get("required_info", {}).get("details", "")
                 logger.info(f"必要情報タイプ: {required_info_type}")
                 
-                # カレンダー情報が必要な場合、スケジュールを取得
+                # 情報タイプに応じた処理
                 if required_info_type == "カレンダー":
+                    # カレンダー情報が必要な場合、スケジュールを取得
                     logger.log_flow(FlowStep.GET_CALENDAR, "Googleカレンダーからスケジュールを取得")
                     # カレンダー情報は response_processor.generate_responses 内で取得される
+                    
+                    # ステップ2: 返信生成
+                    logger.log_flow(FlowStep.GENERATE_RESPONSE, "AIで返信を生成")
+                    try:
+                        async with async_timeout(60):  # 60秒のタイムアウト（AI生成は時間がかかる可能性がある）
+                            responses = await self.response_processor.generate_responses(
+                                prompt,
+                                analysis_result,
+                                email_id=email_data['id']
+                            )
+                    except asyncio.TimeoutError:
+                        logger.error("AI応答生成がタイムアウトしました")
+                        return
                 
-                # ステップ2: 返信生成
-                logger.log_flow(FlowStep.GENERATE_RESPONSE, "AIで返信を生成")
-                try:
-                    async with async_timeout(60):  # 60秒のタイムアウト（AI生成は時間がかかる可能性がある）
-                        responses = await self.response_processor.generate_responses(prompt, analysis_result)
-                except asyncio.TimeoutError:
-                    logger.error("AI応答生成がタイムアウトしました")
+                elif required_info_type == "承認":
+                    # 承認が必要な場合、ユーザーに確認を求める
+                    logger.log_flow(FlowStep.REQUEST_APPROVAL, "ユーザーに承認を求める")
+                    
+                    # 承認リクエストをDiscordに送信
+                    approval_message = f"**承認リクエスト**\n\nこのメールには承認が必要です。\n\n{required_info_details}\n\n承認するには `!approve {email_data['id']}` を、拒否するには `!reject {email_data['id']}` を入力してください。"
+                    
+                    try:
+                        async with async_timeout(15):
+                            await self.discord_bot.send_approval_request(channel_id, email_data, approval_message)
+                    except asyncio.TimeoutError:
+                        logger.error("承認リクエストの送信がタイムアウトしました")
+                    
+                    # 承認待ちの状態なので、ここで処理を終了
+                    logger.info(f"メール {email_data['id']} は承認待ちです")
                     return
+                
+                elif required_info_type == "確認":
+                    # 添付データなどの確認が必要な場合
+                    logger.log_flow(FlowStep.REQUEST_CONFIRMATION, "添付データの確認を求める")
+                    
+                    # メール内のURLやデータを抽出
+                    attachments = self.gmail_client.get_attachments(email_data['id'])
+                    urls = self._extract_urls_from_email(email_data['body'])
+                    
+                    if attachments or urls:
+                        # 添付ファイルやURLがある場合、Discordに送信
+                        try:
+                            async with async_timeout(30):
+                                await self.discord_bot.send_attachments_and_urls(channel_id, email_data, attachments, urls)
+                        except asyncio.TimeoutError:
+                            logger.error("添付ファイル/URL送信がタイムアウトしました")
+                    else:
+                        # 添付ファイルやURLがない場合、エラーメッセージを送信
+                        try:
+                            async with async_timeout(15):
+                                await self.discord_bot.send_message(
+                                    channel_id,
+                                    "**確認が必要なデータが見つかりません**\n\nメールに添付ファイルやURLが含まれていないようです。メールを直接確認してください。"
+                                )
+                        except asyncio.TimeoutError:
+                            logger.error("エラーメッセージの送信がタイムアウトしました")
+                    
+                    # 確認待ちの状態なので、ここで処理を終了
+                    logger.info(f"メール {email_data['id']} は確認待ちです")
+                    return
+                
+                elif required_info_type == "その他":
+                    # その他の情報が必要な場合、ユーザーに対処法を提案
+                    logger.log_flow(FlowStep.REQUEST_OTHER_INFO, "その他の情報を求める")
+                    
+                    # 対処法の提案をDiscordに送信
+                    suggestions = [
+                        "メールの送信者に直接問い合わせる",
+                        "関連する資料や情報を確認する",
+                        "社内の担当者に相談する",
+                        "返信を保留し、追加情報を待つ"
+                    ]
+                    
+                    suggestions_text = "\n".join([f"{i+1}. {suggestion}" for i, suggestion in enumerate(suggestions)])
+                    other_info_message = f"**追加情報が必要です**\n\n{required_info_details}\n\n**対処法の提案:**\n{suggestions_text}\n\n対処法を選択するには `!handle {email_data['id']} [番号または独自の対処法]` を入力してください。"
+                    
+                    try:
+                        async with async_timeout(15):
+                            await self.discord_bot.send_other_info_request(channel_id, email_data, other_info_message)
+                    except asyncio.TimeoutError:
+                        logger.error("その他情報リクエストの送信がタイムアウトしました")
+                    
+                    # 情報待ちの状態なので、ここで処理を終了
+                    logger.info(f"メール {email_data['id']} はその他情報待ちです")
+                    return
+                
+                else:
+                    # 必要情報がない場合は通常の返信生成
+                    logger.log_flow(FlowStep.GENERATE_RESPONSE, "AIで返信を生成")
+                    try:
+                        async with async_timeout(60):  # 60秒のタイムアウト（AI生成は時間がかかる可能性がある）
+                            responses = await self.response_processor.generate_responses(
+                                prompt,
+                                analysis_result,
+                                email_id=email_data['id']
+                            )
+                    except asyncio.TimeoutError:
+                        logger.error("AI応答生成がタイムアウトしました")
+                        return
                 
                 # 返信候補をDiscordに送信
                 logger.log_flow(FlowStep.DISPLAY_RESPONSE, "Discordに返信を表示")
@@ -161,6 +261,18 @@ class EmailBot:
             logger.error(f"詳細なエラー情報: {traceback.format_exc()}")
             if email_data['id'] in self.processing_emails:
                 self.processing_emails.remove(email_data['id'])
+    
+    def _extract_urls_from_email(self, email_body):
+        """メール本文からURLを抽出"""
+        import re
+        # URLを抽出する正規表現パターン
+        url_pattern = r'https?://[^\s<>"]+|www\.[^\s<>"]+|ftp://[^\s<>"]+'
+        
+        # 正規表現でURLを検索
+        urls = re.findall(url_pattern, email_body)
+        
+        # 重複を削除して返す
+        return list(set(urls))
     
     @flow_step(FlowStep.RECEIVE_EMAIL)
     async def check_emails(self):

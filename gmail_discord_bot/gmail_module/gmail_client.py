@@ -120,6 +120,46 @@ class GmailClient:
             logger.error(f"既読マーク設定エラー: {e}")
             return False
     
+    def get_attachments(self, msg_id):
+        """メールの添付ファイルを取得"""
+        try:
+            message = self.service.users().messages().get(
+                userId='me', id=msg_id, format='full'
+            ).execute()
+            
+            attachments = []
+            
+            # メッセージのパート（添付ファイルを含む）を処理
+            if 'parts' in message['payload']:
+                for part in message['payload']['parts']:
+                    if 'filename' in part and part['filename']:
+                        # 添付ファイル情報を取得
+                        filename = part['filename']
+                        attachment_id = part['body'].get('attachmentId')
+                        
+                        if attachment_id:
+                            # 添付ファイルのデータを取得
+                            attachment = self.service.users().messages().attachments().get(
+                                userId='me', messageId=msg_id, id=attachment_id
+                            ).execute()
+                            
+                            file_data = base64.urlsafe_b64decode(attachment['data'])
+                            
+                            # 添付ファイル情報を保存
+                            attachments.append({
+                                'filename': filename,
+                                'data': file_data,
+                                'size': len(file_data),
+                                'mime_type': part.get('mimeType', 'application/octet-stream')
+                            })
+            
+            logger.info(f"メール {msg_id} から {len(attachments)} 件の添付ファイルを取得しました")
+            return attachments
+            
+        except Exception as e:
+            logger.error(f"添付ファイル取得エラー: {e}")
+            return []
+    
     def send_email(self, to, subject, body, thread_id=None):
         """メールを送信する"""
         try:

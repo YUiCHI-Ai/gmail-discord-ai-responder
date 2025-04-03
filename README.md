@@ -276,12 +276,13 @@ python -m gmail_discord_bot.main
 4. プログラムが正常に起動すると、ログにDiscordボットのログイン情報が表示されます
 
 ## 使用方法
-
 ### Discordコマンド一覧
 
 - `!help` - ヘルプメッセージを表示
 - `!status` - ボットのステータスを表示
-- `!edit [内容]` - 提案された返信を編集
+- `!select [番号]` - 提案された返信から選択（番号は1から始まる）
+- `!edit [番号] [新しい内容]` - 提案された返信を編集
+- `!send [番号]` - 選択した返信を実際にメールとして送信
 - `!send` - 返信を実際にメールとして送信
 
 ### メール処理フロー
@@ -291,7 +292,7 @@ python -m gmail_discord_bot.main
 3. 必要な情報のタイプに応じて追加情報を取得します（例：カレンダー情報が必要な場合はGoogleカレンダーから利用可能なスロットを取得）
 4. 分析結果と追加情報を基に、AIが適切な返信を生成します
 5. 生成された返信がDiscordチャンネルに投稿されます
-6. 必要に応じて`!edit`コマンドで返信内容を編集できます
+6. 必要に応じて`!select`コマンドで返信を選択し、`!edit`コマンドで返信内容を編集できます
 7. `!send`コマンドで返信をメールとして送信できます
 
 #### 処理フロー図
@@ -302,7 +303,7 @@ flowchart TD
     B -->|マッピングあり| C[送信者情報から宛名抽出]
     B -->|マッピングなし| Z[処理終了]
     C --> D[Discordチャンネルへ転送]
-    D --> E[メール分析用プロンプト生成]
+    D --> E[システムプロンプトとメール情報を準備]
     E --> F[AIでメール分析]
     F --> G{必要情報の確認}
     G -->|カレンダー情報が必要| H[Googleカレンダーから\nスケジュール取得]
@@ -311,9 +312,9 @@ flowchart TD
     H --> K[AI APIで返信生成]
     I --> K
     J --> K
-    K --> L[Discordに返信を表示]
+    K --> L[Discordに返信候補を表示]
     L --> M{編集が必要?}
-    M -->|はい| N[ユーザーによる編集\n!editコマンド]
+    M -->|はい| N[ユーザーによる選択と編集\n!select/!editコマンド]
     M -->|いいえ| O[ユーザーによる送信\n!sendコマンド]
     N --> O
     O --> P[Gmailで返信メール送信]
@@ -326,6 +327,8 @@ flowchart TD
 gmail_discord_bot/
 ├── __init__.py
 ├── main.py                      # アプリケーションのエントリーポイント
+├── get_gmail_token.py           # Gmail APIトークン取得スクリプト
+├── test_gmail_api.py            # Gmail API動作確認スクリプト
 ├── gmail_module/                # Gmailとの連携を担当
 │   ├── __init__.py
 │   ├── gmail_client.py          # Gmail APIクライアント
@@ -340,11 +343,9 @@ gmail_discord_bot/
 │   └── name_manager.py          # 宛名情報の管理
 ├── chatgpt_module/              # ChatGPT連携を担当
 │   ├── __init__.py
-│   ├── prompt_generator.py      # プロンプト生成
 │   └── response_processor.py    # 応答処理
 ├── claude_module/               # Claude連携を担当
 │   ├── __init__.py
-│   ├── prompt_generator.py      # プロンプト生成
 │   └── response_processor.py    # 応答処理
 ├── ai_module/                   # AI共通モジュール
 │   ├── __init__.py
@@ -363,17 +364,22 @@ gmail_discord_bot/
 │   ├── .env                     # 環境変数（作成必要）
 │   ├── email_analyzer_prompt.txt # メール分析用システムプロンプト
 │   ├── email_responder_prompt.txt # 返信生成用システムプロンプト
+│   ├── system_prompts.json      # システムプロンプト設定
 │   └── data/                    # JSONデータファイル保存ディレクトリ
+│       └── name_database.json   # 名前データベース
+├── logs/                        # ログファイル保存ディレクトリ
 └── tests/                       # テスト
     ├── __init__.py
     ├── test_gmail.py
     ├── test_discord.py
     ├── test_name.py
     ├── test_chatgpt.py
-    ├── test_claude.py
     ├── test_calendar.py
+    ├── test_config.py
     └── test_integration.py
 ```
+
+**注意**: プロンプト生成機能は直接 `config.py` から取得するように最適化されたため、`prompt_generator.py` ファイルは不要になりました。
 
 ## トラブルシューティング
 
