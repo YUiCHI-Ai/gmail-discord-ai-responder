@@ -2,6 +2,7 @@ import datetime
 import pytz
 from ..utils.logger import setup_logger
 from .calendar_client import CalendarClient
+from ..config import config
 
 logger = setup_logger(__name__)
 
@@ -9,10 +10,23 @@ class ScheduleAnalyzer:
     def __init__(self, calendar_client=None):
         self.calendar_client = calendar_client or CalendarClient()
         self.jst = pytz.timezone('Asia/Tokyo')
+        self.settings = config.get_email_settings()
     
-    def get_available_slots(self, days=7, working_hours=(9, 18), duration_minutes=60):
+    def get_available_slots(self, days=None, working_hours=None, duration_minutes=None):
         """利用可能な時間枠を取得"""
         try:
+            # 設定ファイルから値を取得（引数で上書き可能）
+            calendar_settings = self.settings.get("calendar", {})
+            days = days or calendar_settings.get("days", 30)
+            
+            working_hours_settings = calendar_settings.get("working_hours", {})
+            start_hour = working_hours_settings.get("start", 18)
+            end_hour = working_hours_settings.get("end", 23)
+            working_hours = working_hours or (start_hour, end_hour)
+            
+            duration_minutes = duration_minutes or calendar_settings.get("duration_minutes", 60)
+            skip_weekends = calendar_settings.get("skip_weekends", True)
+            
             # 現在時刻（JST）
             now = datetime.datetime.now(self.jst)
             
@@ -69,13 +83,14 @@ class ScheduleAnalyzer:
             for day in range(days):
                 current_date = start_date + datetime.timedelta(days=day)
                 
-                # 土日はスキップ
-                if current_date.weekday() >= 5:  # 5=土曜日, 6=日曜日
+                # 土日はスキップ（設定ファイルで制御可能）
+                if skip_weekends and current_date.weekday() >= 5:  # 5=土曜日, 6=日曜日
                     continue
                 
-                # 営業時間内で1時間ごとにスロットを生成
-                for hour in range(working_hours[0], working_hours[1] - (duration_minutes // 60)):
+                # 営業時間内で30分ごとにスロットを生成
+                for hour in range(working_hours[0], working_hours[1]):
                     for minute in [0, 30]:  # 30分単位でスロットを生成
+                        # 最後の時間帯で、スロットが営業時間を超える場合はスキップ
                         if hour == working_hours[1] - 1 and minute + duration_minutes > 60:
                             continue
                         
@@ -113,10 +128,10 @@ class ScheduleAnalyzer:
         
         except Exception as e:
             logger.error(f"スケジュール分析エラー: {e}")
-            # エラー時は仮のスロットを返す
+            # エラー時は仮のスロットを返す（18:00-23:00の時間帯に合わせて）
             return [
-                f"{(now + datetime.timedelta(days=i)).strftime('%Y年%m月%d日')}の午後",
-                f"{(now + datetime.timedelta(days=i+1)).strftime('%Y年%m月%d日')}の午前"
+                f"{(now + datetime.timedelta(days=i)).strftime('%Y年%m月%d日')}の夜（18:00-20:00）",
+                f"{(now + datetime.timedelta(days=i+1)).strftime('%Y年%m月%d日')}の夜（20:00-22:00）"
             ]
     
     # 未使用のメソッドを削除

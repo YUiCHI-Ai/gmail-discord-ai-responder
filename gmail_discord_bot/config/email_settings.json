@@ -1,0 +1,17 @@
+{
+  "calendar": {
+    "days": 30,
+    "working_hours": {
+      "start": 18,
+      "end": 23
+    },
+    "duration_minutes": 60,
+    "skip_weekends": true
+  },
+  "signature": {
+    "company_name": "AiHUB株式会社",
+    "name": "YUiCHI",
+    "email": "yuichi@aihub.tokyo",
+    "url": "https://aihub.co.jp/about"
+  }
+}

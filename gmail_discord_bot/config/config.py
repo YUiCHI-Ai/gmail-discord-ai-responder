@@ -42,6 +42,9 @@ NAME_DATABASE_FILE = DATA_DIR / "name_database.json"
 # メールとチャンネルのマッピング
 EMAIL_CHANNEL_MAPPING_FILE = config_dir / os.getenv("EMAIL_CHANNEL_MAPPING_FILE", "email_channel_mapping.json")
 
+# メール設定ファイル
+EMAIL_SETTINGS_FILE = config_dir / "email_settings.json"
+
 def get_email_channel_mapping():
     """メールアドレスとDiscordチャンネルのマッピングを取得"""
     try:
@@ -86,5 +89,60 @@ def get_email_responder_prompt():
         print(f"メール返信プロンプト読み込みエラー: {e}")
         # エラー時のフォールバック
         return "あなたはメール返信アシスタント「メール返信くん」です。適切な返信を作成してください。"
+
+def get_email_settings():
+    """メール設定を取得"""
+    try:
+        with open(EMAIL_SETTINGS_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        # デフォルトの設定を返す
+        return {
+            "calendar": {
+                "days": 30,
+                "working_hours": {
+                    "start": 18,
+                    "end": 23
+                },
+                "duration_minutes": 60,
+                "skip_weekends": True
+            },
+            "signature": {
+                "company_name": "AiHUB株式会社",
+                "name": "YUiCHI",
+                "email": "yuichi@aihub.tokyo",
+                "url": "https://aihub.co.jp/about"
+            }
+        }
+    except Exception as e:
+        print(f"メール設定読み込みエラー: {e}")
+        # エラー時のフォールバック
+        return {
+            "calendar": {
+                "days": 30,
+                "working_hours": {
+                    "start": 18,
+                    "end": 23
+                },
+                "duration_minutes": 60,
+                "skip_weekends": True
+            },
+            "signature": {
+                "company_name": "AiHUB株式会社",
+                "name": "YUiCHI",
+                "email": "yuichi@aihub.tokyo",
+                "url": "https://aihub.co.jp/about"
+            }
+        }
+
+def save_email_settings(settings):
+    """メール設定を保存"""
+    try:
+        with open(EMAIL_SETTINGS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(settings, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception as e:
+        print(f"メール設定保存エラー: {e}")
+        return False
 
 # 後方互換性のための関数は不要になりました

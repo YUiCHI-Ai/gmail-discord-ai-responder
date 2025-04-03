@@ -15,6 +15,7 @@ class ClaudeResponseProcessor:
         self.model = config.CLAUDE_MODEL  # .envファイルで設定されたモデル
         self.schedule_analyzer = ScheduleAnalyzer()
         self.output_saver = OutputSaver()  # LLM出力保存用
+        self.settings = config.get_email_settings()
     
     async def analyze_email(self, prompt, email_id=None):
         """Claude APIを使用してメールを分析"""
@@ -88,11 +89,21 @@ class ClaudeResponseProcessor:
             # 返信生成用のシステムプロンプトを取得
             system_prompt = config.get_email_responder_prompt()
             
+            # 署名情報を取得
+            signature_settings = self.settings.get("signature", {})
+            company_name = signature_settings.get("company_name")
+            name = signature_settings.get("name")
+            email = signature_settings.get("email")
+            url = signature_settings.get("url")
+            
+            # 署名情報をプロンプトに追加
+            signature_info = f"\n\n# 署名情報\n会社名: {company_name}\n名前: {name}\nEmail: {email}\nURL: {url}"
+            
             # 分析結果を含めたプロンプトを作成
             full_prompt = prompt
             if analysis_result:
                 analysis = analysis_result.get("analysis", "")
-                full_prompt = f"{prompt}\n\n# メール分析結果\n{analysis}{additional_info_text}"
+                full_prompt = f"{prompt}\n\n# メール分析結果\n{analysis}{additional_info_text}{signature_info}"
             
             # 非同期クライアントを使用
             response = await self.async_client.messages.create(
