@@ -15,11 +15,15 @@ class ClaudeResponseProcessor:
     async def generate_responses(self, prompt, num_responses=3):
         """Claude APIを使用して返信を生成"""
         try:
+            # 共通のシステムプロンプトを取得
+            system_prompt = config.get_system_prompt()
+            
             # 非同期クライアントを直接使用
             response = await self.async_client.messages.create(
                 model=self.model,
                 max_tokens=2000,
                 temperature=0.7,
+                system=system_prompt,  # システムプロンプトを設定
                 messages=[
                     {"role": "user", "content": prompt}
                 ]

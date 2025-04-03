@@ -12,10 +12,13 @@ class ResponseProcessor:
     async def generate_responses(self, prompt, num_responses=3):
         """ChatGPT APIを使用して返信を生成"""
         try:
+            # 共通のシステムプロンプトを取得
+            system_prompt = config.get_system_prompt()
+            
             response = openai.ChatCompletion.create(
                 model="gpt-4",  # または利用可能な最新モデル
                 messages=[
-                    {"role": "system", "content": "あなたはプロフェッショナルなビジネスメール返信を作成するアシスタントです。"},
+                    {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.7,

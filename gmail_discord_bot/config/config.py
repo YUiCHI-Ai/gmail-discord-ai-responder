@@ -21,6 +21,9 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY")
 DEFAULT_AI_PROVIDER = os.getenv("DEFAULT_AI_PROVIDER", "chatgpt")  # デフォルトはChatGPT
 
+# システムプロンプト設定
+SYSTEM_PROMPTS_FILE = config_dir / "system_prompts.json"
+
 # Google Calendar API設定
 CALENDAR_CREDENTIALS_FILE = config_dir / os.getenv("CALENDAR_CREDENTIALS_FILE")
 CALENDAR_TOKEN_FILE = config_dir / os.getenv("CALENDAR_TOKEN_FILE")
@@ -54,3 +57,32 @@ def save_email_channel_mapping(mapping):
     except Exception as e:
         print(f"マッピング保存エラー: {e}")
         return False
+
+def get_system_prompts():
+    """システムプロンプトを取得"""
+    try:
+        with open(SYSTEM_PROMPTS_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        # デフォルトのシステムプロンプトを返す
+        return {
+            "common": {
+                "system_prompt": "あなたはプロフェッショナルなビジネスメール返信を作成するアシスタントです。"
+            }
+        }
+    except Exception as e:
+        print(f"システムプロンプト読み込みエラー: {e}")
+        # エラー時のフォールバック
+        return {
+            "common": {
+                "system_prompt": "あなたはプロフェッショナルなビジネスメール返信を作成するアシスタントです。"
+            }
+        }
+
+def get_system_prompt():
+    """共通のシステムプロンプトを取得"""
+    prompts = get_system_prompts()
+    return prompts.get("common", {}).get(
+        "system_prompt",
+        "あなたはプロフェッショナルなビジネスメール返信を作成するアシスタントです。"
+    )
