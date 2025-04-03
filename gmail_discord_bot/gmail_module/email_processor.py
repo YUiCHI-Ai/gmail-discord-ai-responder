@@ -1,6 +1,6 @@
 import re
 from ..config import config
-from ..utils.logger import setup_logger
+from ..utils.logger import setup_logger, flow_step, FlowStep
 from .gmail_client import GmailClient
 
 logger = setup_logger(__name__)
@@ -10,9 +10,12 @@ class EmailProcessor:
         self.gmail_client = gmail_client or GmailClient()
         self.email_channel_mapping = config.get_email_channel_mapping()
     
+    @flow_step(FlowStep.RECEIVE_EMAIL)
     def process_new_emails(self, max_emails=10):
         """新しいメールを処理"""
         emails = self.gmail_client.get_unread_emails(max_emails)
+        logger.log_flow(FlowStep.RECEIVE_EMAIL, f"{len(emails)}件の未読メールを取得")
+        
         processed_emails = []
         
         for email_data in emails:
@@ -20,6 +23,7 @@ class EmailProcessor:
             sender_email = self._extract_email_address(email_data['sender'])
             
             # 対応するDiscordチャンネルを検索
+            logger.log_flow(FlowStep.CHECK_SENDER, f"メール {email_data['id']} の送信元アドレスを確認")
             channel_id = self._get_channel_for_email(sender_email)
             
             if channel_id:
@@ -29,9 +33,9 @@ class EmailProcessor:
                 
                 # メールを既読にする
                 self.gmail_client.mark_as_read(email_data['id'])
-                logger.info(f"メール {email_data['id']} を処理対象としてマーク")
+                logger.log_flow(FlowStep.CHECK_SENDER, f"メール {email_data['id']} を処理対象としてマーク")
             else:
-                logger.info(f"メール {email_data['id']} は処理対象外: マッピングなし")
+                logger.log_flow(FlowStep.CHECK_SENDER, f"メール {email_data['id']} は処理対象外: マッピングなし")
         
         return processed_emails
     

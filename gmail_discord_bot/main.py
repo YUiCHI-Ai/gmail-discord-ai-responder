@@ -25,7 +25,7 @@ from gmail_discord_bot.discord_module.message_formatter import MessageFormatter
 from gmail_discord_bot.name_module.name_manager import NameManager
 from gmail_discord_bot.ai_module.ai_factory import AIFactory
 from gmail_discord_bot.calendar_module.schedule_analyzer import ScheduleAnalyzer
-from gmail_discord_bot.utils.logger import setup_logger
+from gmail_discord_bot.utils.logger import setup_logger, flow_step, FlowStep
 from gmail_discord_bot.config import config
 
 logger = setup_logger(__name__)
@@ -34,7 +34,7 @@ class EmailBot:
     def __init__(self, ai_provider=None):
         # AIプロバイダーの設定
         self.ai_provider = ai_provider or config.DEFAULT_AI_PROVIDER
-        logger.info(f"AIプロバイダー '{self.ai_provider}' を使用します")
+        logger.log_flow(FlowStep.RECEIVE_EMAIL, f"AIプロバイダー '{self.ai_provider}' を使用します")
         
         # 各モジュールの初期化
         self.gmail_client = GmailClient()
@@ -52,6 +52,7 @@ class EmailBot:
         # 定期チェックの設定
         self.check_interval = 60  # 60秒ごとにメールをチェック
     
+    @flow_step(FlowStep.RECEIVE_EMAIL)
     async def process_email_for_discord(self, email_data):
         """メールを処理してDiscordに送信"""
         try:
@@ -62,9 +63,12 @@ class EmailBot:
             
             self.processing_emails.add(email_data['id'])
             
-            # タスクとして実行
-            async def process_task():
+            try:
+                # 送信元アドレスの確認
+                logger.log_flow(FlowStep.CHECK_SENDER, f"メール {email_data['id']} の送信元を確認")
+                
                 # 送信者情報を処理
+                logger.log_flow(FlowStep.EXTRACT_ADDRESS, "送信者情報から宛名を抽出")
                 sender_info = self.name_manager.process_email(email_data)
                 sender_email = sender_info['email']
                 
@@ -72,41 +76,49 @@ class EmailBot:
                 address = self.name_manager.format_address(sender_email)
                 
                 # Discordチャンネルにメール通知を送信
+                logger.log_flow(FlowStep.TRANSFER_TO_DISCORD, "Discordチャンネルへメールを転送")
                 channel_id = email_data['discord_channel_id']
                 await self.discord_bot.send_email_notification(channel_id, email_data)
                 
                 # 日程調整関連のメールかどうかを判定
+                logger.log_flow(FlowStep.CHECK_SCHEDULE, "日程調整関連のメールか判定")
                 is_schedule = self.prompt_generator.is_schedule_related(email_data)
                 
                 # プロンプトを生成
                 if is_schedule:
                     # 利用可能なスロットを取得
+                    logger.log_flow(FlowStep.GET_CALENDAR, "Googleカレンダーからスケジュールを取得")
                     available_slots = self.schedule_analyzer.get_available_slots()
+                    
+                    logger.log_flow(FlowStep.GENERATE_PROMPT, "日程調整用プロンプトを生成")
                     prompt = self.prompt_generator.generate_schedule_prompt(
                         email_data, sender_info, address, available_slots
                     )
                 else:
+                    logger.log_flow(FlowStep.GENERATE_PROMPT, "通常の返信プロンプトを生成")
                     prompt = self.prompt_generator.generate_normal_prompt(
                         email_data, sender_info, address
                     )
                 
                 # 返信候補を生成
+                logger.log_flow(FlowStep.GENERATE_RESPONSE, "AI APIで返信を生成")
                 responses = await self.response_processor.generate_responses(prompt)
                 
                 # 返信候補をDiscordに送信
+                logger.log_flow(FlowStep.DISPLAY_RESPONSE, "Discordに返信を表示")
                 await self.discord_bot.send_response_options(channel_id, email_data, responses)
                 
+                logger.log_flow(FlowStep.COMPLETE, f"メール {email_data['id']} の処理を完了")
+            finally:
                 # 処理完了したメールをトラッキングから削除
                 self.processing_emails.remove(email_data['id'])
-            
-            # タスクを実行
-            await process_task()
             
         except Exception as e:
             logger.error(f"メール処理エラー: {e}")
             if email_data['id'] in self.processing_emails:
                 self.processing_emails.remove(email_data['id'])
     
+    @flow_step(FlowStep.RECEIVE_EMAIL)
     async def check_emails(self):
         """新しいメールをチェックして処理"""
         try:
@@ -114,7 +126,7 @@ class EmailBot:
             emails = self.email_processor.process_new_emails()
             
             if emails:
-                logger.info(f"{len(emails)}件の新しいメールを処理します")
+                logger.log_flow(FlowStep.RECEIVE_EMAIL, f"{len(emails)}件の新しいメールを処理します")
                 
                 # 各メールを処理
                 for email_data in emails:
@@ -155,5 +167,6 @@ class EmailBot:
         self.discord_bot.run()
 
 if __name__ == "__main__":
+    logger.log_flow(FlowStep.RECEIVE_EMAIL, "アプリケーションを起動")
     bot = EmailBot()
     bot.run()
