@@ -14,7 +14,7 @@ class DiscordBot:
         intents = discord.Intents.default()
         intents.message_content = True
         
-        self.bot = commands.Bot(command_prefix='!', intents=intents)
+        self.bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
         self.setup_events()
         self.setup_commands()
         

@@ -1,4 +1,5 @@
 import re
+import asyncio
 import anthropic
 from ..config import config
 from ..utils.logger import setup_logger
@@ -8,19 +9,26 @@ logger = setup_logger(__name__)
 class ClaudeResponseProcessor:
     def __init__(self):
         self.client = anthropic.Anthropic(api_key=config.CLAUDE_API_KEY)
+        self.async_client = anthropic.AsyncAnthropic(api_key=config.CLAUDE_API_KEY)
         self.model = "claude-3-sonnet-20240229"  # デフォルトモデル
     
     async def generate_responses(self, prompt, num_responses=3):
         """Claude APIを使用して返信を生成"""
         try:
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=2000,
-                temperature=0.7,
-                messages=[
-                    {"role": "user", "content": prompt}
-                ]
-            )
+            # タスクとして実行
+            async def api_call_task():
+                # 非同期クライアントを使用
+                return await self.async_client.messages.create(
+                    model=self.model,
+                    max_tokens=2000,
+                    temperature=0.7,
+                    messages=[
+                        {"role": "user", "content": prompt}
+                    ]
+                )
+            
+            # タスクを実行
+            response = await api_call_task()
             
             # レスポンスから返信テキストを抽出
             response_text = response.content[0].text

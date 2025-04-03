@@ -16,11 +16,19 @@ class CalendarClient:
         self.creds = None
         self.service = None
         self.initialize_service()
-    
     def initialize_service(self):
         """GoogleカレンダーAPIサービスの初期化"""
-        if os.path.exists(config.CALENDAR_TOKEN_FILE):
-            with open(config.CALENDAR_TOKEN_FILE, 'rb') as token:
+        token_exists = os.path.exists(config.CALENDAR_TOKEN_FILE)
+        token_has_content = token_exists and os.path.getsize(config.CALENDAR_TOKEN_FILE) > 0
+        
+        if token_has_content:
+            try:
+                with open(config.CALENDAR_TOKEN_FILE, 'rb') as token:
+                    self.creds = pickle.load(token)
+                logger.info("カレンダートークンを読み込みました")
+            except (EOFError, pickle.UnpicklingError) as e:
+                logger.error(f"カレンダートークンの読み込みに失敗しました: {e}")
+                self.creds = None
                 self.creds = pickle.load(token)
         
         # 認証情報がない、または期限切れの場合

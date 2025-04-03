@@ -1,6 +1,26 @@
 {
-  "specific.user@example.com": "1234567890123456789",
-  "another.user@example.com": "9876543210987654321",
-  "*@example.com": "1122334455667788990",
-  "*@another-domain.com": "9988776655443322110"
+  "specific.user@example.com": {
+    "email": "specific.user@example.com",
+    "name": "山田太郎",
+    "company": "Example株式会社",
+    "discord_channel_id": "1234567890123456789"
+  },
+  "another.user@example.com": {
+    "email": "another.user@example.com",
+    "name": "佐藤花子",
+    "company": "Example株式会社",
+    "discord_channel_id": "9876543210987654321"
+  },
+  "*@example.com": {
+    "email": "*@example.com",
+    "name": "",
+    "company": "Example株式会社",
+    "discord_channel_id": "1122334455667788990"
+  },
+  "*@another-domain.com": {
+    "email": "*@another-domain.com",
+    "name": "",
+    "company": "Another Domain Inc.",
+    "discord_channel_id": "9988776655443322110"
+  }
 }

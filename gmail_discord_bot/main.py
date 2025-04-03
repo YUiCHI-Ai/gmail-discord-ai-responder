@@ -62,40 +62,45 @@ class EmailBot:
             
             self.processing_emails.add(email_data['id'])
             
-            # 送信者情報を処理
-            sender_info = self.name_manager.process_email(email_data)
-            sender_email = sender_info['email']
+            # タスクとして実行
+            async def process_task():
+                # 送信者情報を処理
+                sender_info = self.name_manager.process_email(email_data)
+                sender_email = sender_info['email']
+                
+                # 宛名を生成
+                address = self.name_manager.format_address(sender_email)
+                
+                # Discordチャンネルにメール通知を送信
+                channel_id = email_data['discord_channel_id']
+                await self.discord_bot.send_email_notification(channel_id, email_data)
+                
+                # 日程調整関連のメールかどうかを判定
+                is_schedule = self.prompt_generator.is_schedule_related(email_data)
+                
+                # プロンプトを生成
+                if is_schedule:
+                    # 利用可能なスロットを取得
+                    available_slots = self.schedule_analyzer.get_available_slots()
+                    prompt = self.prompt_generator.generate_schedule_prompt(
+                        email_data, sender_info, address, available_slots
+                    )
+                else:
+                    prompt = self.prompt_generator.generate_normal_prompt(
+                        email_data, sender_info, address
+                    )
+                
+                # 返信候補を生成
+                responses = await self.response_processor.generate_responses(prompt)
+                
+                # 返信候補をDiscordに送信
+                await self.discord_bot.send_response_options(channel_id, email_data, responses)
+                
+                # 処理完了したメールをトラッキングから削除
+                self.processing_emails.remove(email_data['id'])
             
-            # 宛名を生成
-            address = self.name_manager.format_address(sender_email)
-            
-            # Discordチャンネルにメール通知を送信
-            channel_id = email_data['discord_channel_id']
-            await self.discord_bot.send_email_notification(channel_id, email_data)
-            
-            # 日程調整関連のメールかどうかを判定
-            is_schedule = self.prompt_generator.is_schedule_related(email_data)
-            
-            # プロンプトを生成
-            if is_schedule:
-                # 利用可能なスロットを取得
-                available_slots = self.schedule_analyzer.get_available_slots()
-                prompt = self.prompt_generator.generate_schedule_prompt(
-                    email_data, sender_info, address, available_slots
-                )
-            else:
-                prompt = self.prompt_generator.generate_normal_prompt(
-                    email_data, sender_info, address
-                )
-            
-            # 返信候補を生成
-            responses = await self.response_processor.generate_responses(prompt)
-            
-            # 返信候補をDiscordに送信
-            await self.discord_bot.send_response_options(channel_id, email_data, responses)
-            
-            # 処理完了したメールをトラッキングから削除
-            self.processing_emails.remove(email_data['id'])
+            # タスクを実行
+            await process_task()
             
         except Exception as e:
             logger.error(f"メール処理エラー: {e}")

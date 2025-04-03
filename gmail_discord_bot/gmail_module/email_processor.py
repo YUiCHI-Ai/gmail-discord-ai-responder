@@ -49,16 +49,16 @@ class EmailProcessor:
         """メールアドレスに対応するDiscordチャンネルIDを取得"""
         # 完全一致
         if email_address in self.email_channel_mapping:
-            return self.email_channel_mapping[email_address]
+            return self.email_channel_mapping[email_address]["discord_channel_id"]
         
         # ドメイン一致（example.com形式のマッピングがある場合）
         domain = email_address.split('@')[-1]
         if domain in self.email_channel_mapping:
-            return self.email_channel_mapping[domain]
+            return self.email_channel_mapping[domain]["discord_channel_id"]
         
         # ワイルドカードマッピング（*@example.com形式）
         wildcard = f"*@{domain}"
         if wildcard in self.email_channel_mapping:
-            return self.email_channel_mapping[wildcard]
+            return self.email_channel_mapping[wildcard]["discord_channel_id"]
         
         return None
