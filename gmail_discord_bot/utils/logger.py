@@ -13,6 +13,7 @@ class FlowStep(Enum):
     CHECK_SCHEDULE = auto()          # 日程調整関連か判定
     GET_CALENDAR = auto()            # Googleカレンダーからスケジュール取得
     GENERATE_PROMPT = auto()         # プロンプト生成
+    ANALYZE_EMAIL = auto()           # AIでメール分析
     GENERATE_RESPONSE = auto()       # AI APIで返信生成
     DISPLAY_RESPONSE = auto()        # Discordに返信を表示
     EDIT_RESPONSE = auto()           # ユーザーによる編集

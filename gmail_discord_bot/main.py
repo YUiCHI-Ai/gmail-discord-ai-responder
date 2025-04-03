@@ -95,32 +95,44 @@ class EmailBot:
                     logger.error(f"メール通知の送信がタイムアウトしました: チャンネルID {channel_id}")
                     return
                 
-                # 日程調整関連のメールかどうかを判定
-                logger.log_flow(FlowStep.CHECK_SCHEDULE, "日程調整関連のメールか判定")
-                is_schedule = self.prompt_generator.is_schedule_related(email_data)
-                logger.info(f"日程調整関連のメール: {is_schedule}")
+                # 基本プロンプトを生成
+                logger.log_flow(FlowStep.GENERATE_PROMPT, "メール分析用プロンプトを生成")
                 
-                # プロンプトを生成
-                if is_schedule:
-                    # 利用可能なスロットを取得
+                # メール情報を含むプロンプトを生成
+                prompt = f"""
+# 元のメール情報
+件名: {email_data['subject']}
+送信者: {email_data['sender']}
+本文:
+{email_data['body']}
+
+# 宛名情報
+宛名: {address}
+"""
+                
+                # ステップ1: メール分析
+                logger.log_flow(FlowStep.ANALYZE_EMAIL, "AIでメールを分析")
+                try:
+                    async with async_timeout(30):  # 30秒のタイムアウト
+                        analysis_result = await self.response_processor.analyze_email(prompt)
+                except asyncio.TimeoutError:
+                    logger.error("メール分析がタイムアウトしました")
+                    return
+                
+                # 必要情報の確認
+                required_info_type = analysis_result.get("required_info", {}).get("type")
+                logger.info(f"必要情報タイプ: {required_info_type}")
+                
+                # カレンダー情報が必要な場合、スケジュールを取得
+                if required_info_type == "カレンダー":
                     logger.log_flow(FlowStep.GET_CALENDAR, "Googleカレンダーからスケジュールを取得")
-                    available_slots = self.schedule_analyzer.get_available_slots()
-                    
-                    logger.log_flow(FlowStep.GENERATE_PROMPT, "日程調整用プロンプトを生成")
-                    prompt = self.prompt_generator.generate_schedule_prompt(
-                        email_data, sender_info, address, available_slots
-                    )
-                else:
-                    logger.log_flow(FlowStep.GENERATE_PROMPT, "通常の返信プロンプトを生成")
-                    prompt = self.prompt_generator.generate_normal_prompt(
-                        email_data, sender_info, address
-                    )
+                    # カレンダー情報は response_processor.generate_responses 内で取得される
                 
-                # 返信候補を生成
-                logger.log_flow(FlowStep.GENERATE_RESPONSE, "AI APIで返信を生成")
+                # ステップ2: 返信生成
+                logger.log_flow(FlowStep.GENERATE_RESPONSE, "AIで返信を生成")
                 try:
                     async with async_timeout(60):  # 60秒のタイムアウト（AI生成は時間がかかる可能性がある）
-                        responses = await self.response_processor.generate_responses(prompt)
+                        responses = await self.response_processor.generate_responses(prompt, analysis_result)
                 except asyncio.TimeoutError:
                     logger.error("AI応答生成がタイムアウトしました")
                     return
