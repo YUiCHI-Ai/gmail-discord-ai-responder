@@ -82,9 +82,40 @@ class ClaudeResponseProcessor:
             if analysis_result and analysis_result.get("required_info", {}).get("type") == "カレンダー":
                 # カレンダー情報が必要な場合、利用可能なスロットを取得
                 available_slots = self.schedule_analyzer.get_available_slots()
-                slots_text = "\n".join([f"- {slot}" for slot in available_slots])
-                additional_info_text = f"\n\n# 利用可能な日時スロット\n以下の日時が空いています：\n{slots_text}"
-                additional_info = {"type": "カレンダー", "available_slots": available_slots}
+                
+                # メール分析結果から日程候補を抽出し、最適な日程を提案
+                analysis_text = analysis_result.get("analysis", "")
+                date_suggestions = analysis_result.get("required_info", {}).get("date_suggestions", [])
+                schedule_suggestion = self.schedule_analyzer.analyze_date_suggestions(
+                    analysis_text,
+                    available_slots,
+                    date_suggestions=date_suggestions
+                )
+                
+                # 提案情報をテキストに変換
+                if schedule_suggestion["has_match"]:
+                    # 一致するスロットがある場合
+                    selected_slot = schedule_suggestion["selected_slot"]
+                    additional_info_text = f"\n\n# 日程提案\n{schedule_suggestion['message']}\n\n選択された日程: {selected_slot}"
+                else:
+                    # 一致するスロットがない場合、代替案を提示
+                    alternative_slots = schedule_suggestion["alternative_slots"]
+                    if alternative_slots:
+                        slots_text = "\n".join([f"- {slot}" for slot in alternative_slots])
+                        additional_info_text = f"\n\n# 日程提案\n{schedule_suggestion['message']}\n\n代替日程候補:\n{slots_text}"
+                    else:
+                        additional_info_text = f"\n\n# 日程提案\n{schedule_suggestion['message']}"
+                
+                # 利用可能なすべてのスロットも追加（参考情報として）
+                all_slots_text = "\n".join([f"- {slot}" for slot in available_slots])
+                additional_info_text += f"\n\n# 利用可能な日時スロット（参考）\n以下の日時が空いています：\n{all_slots_text}"
+                
+                # 追加情報を設定
+                additional_info = {
+                    "type": "カレンダー",
+                    "available_slots": available_slots,
+                    "schedule_suggestion": schedule_suggestion
+                }
             
             # 返信生成用のシステムプロンプトを取得
             system_prompt = config.get_email_responder_prompt()
@@ -165,13 +196,30 @@ class ClaudeResponseProcessor:
         details_pattern = r'<必要情報>.*?<詳細>(.*?)</詳細>.*?</必要情報>'
         details_match = re.search(details_pattern, text, re.DOTALL)
         
+        # 日程候補を抽出（カレンダー情報の場合）
+        date_suggestions = []
+        date_pattern = r'<日程候補>(.*?)</日程候補>'
+        date_match = re.search(date_pattern, text, re.DOTALL)
+        if date_match:
+            date_content = date_match.group(1)
+            suggestion_pattern = r'<候補>(.*?)</候補>'
+            date_suggestions = re.findall(suggestion_pattern, date_content, re.DOTALL)
+            date_suggestions = [suggestion.strip() for suggestion in date_suggestions]
+            logger.info(f"抽出された日程候補: {date_suggestions}")
+        
         if type_match:
             info_type = type_match.group(1).strip()
             details = details_match.group(1).strip() if details_match else ""
-            return {
+            result = {
                 "type": info_type,
                 "details": details
             }
+            
+            # カレンダー情報の場合は日程候補も追加
+            if info_type == "カレンダー" and date_suggestions:
+                result["date_suggestions"] = date_suggestions
+                
+            return result
         return {"type": None, "details": ""}
     
     def _split_responses(self, response_text):
