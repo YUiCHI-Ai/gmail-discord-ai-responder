@@ -86,34 +86,69 @@ class ClaudeResponseProcessor:
                 # メール分析結果から日程候補を抽出し、最適な日程を提案
                 analysis_text = analysis_result.get("analysis", "")
                 date_suggestions = analysis_result.get("required_info", {}).get("date_suggestions", [])
+                
+                # 日程候補のログ出力
+                logger.info(f"【新処理】日程候補: {date_suggestions}")
+                
+                # 日程分析を実行
                 schedule_suggestion = self.schedule_analyzer.analyze_date_suggestions(
                     analysis_text,
                     available_slots,
                     date_suggestions=date_suggestions
                 )
                 
+                # メッセージから年を確実に削除（メッセージ自体を修正）
+                if "message" in schedule_suggestion:
+                    original_message = schedule_suggestion["message"]
+                    clean_message = re.sub(r'\d{4}年', '', original_message)
+                    schedule_suggestion["message"] = clean_message
+                    logger.info(f"メッセージから年を削除: '{original_message}' -> '{clean_message}'")
+                
                 # 提案情報をテキストに変換
                 if schedule_suggestion["has_match"]:
                     # 一致するスロットがある場合
                     selected_slot = schedule_suggestion["selected_slot"]
-                    additional_info_text = f"\n\n# 日程提案\n{schedule_suggestion['message']}\n\n選択された日程: {selected_slot}"
+                    
+                    if selected_slot:
+                        # selected_slotは既に年が削除されているはず（念のため確認）
+                        if "年" in selected_slot:
+                            logger.warning(f"選択されたスロットに年が含まれています: {selected_slot}")
+                            selected_slot = re.sub(r'\d{4}年', '', selected_slot).strip()
+                        
+                        logger.info(f"【新処理】選択されたスロット: {selected_slot}")
+                        additional_info_text = f"\n\n# 日程提案\n{schedule_suggestion['message']}\n\n選択された日程: {selected_slot}"
+                    else:
+                        additional_info_text = f"\n\n# 日程提案\n{schedule_suggestion['message']}"
                 else:
                     # 一致するスロットがない場合、代替案を提示
                     alternative_slots = schedule_suggestion["alternative_slots"]
-                    if alternative_slots:
-                        slots_text = "\n".join([f"- {slot}" for slot in alternative_slots])
+                    
+                    # alternative_slotsは既に年が削除されているはず（念のため確認）
+                    clean_alternatives = []
+                    for slot in alternative_slots:
+                        if "年" in slot:
+                            logger.warning(f"代替スロットに年が含まれています: {slot}")
+                            clean_slot = re.sub(r'\d{4}年', '', slot).strip()
+                            clean_alternatives.append(clean_slot)
+                        else:
+                            clean_alternatives.append(slot)
+                    
+                    logger.info(f"【新処理】代替スロット: {clean_alternatives}")
+                    
+                    if clean_alternatives:
+                        # 最大3つの代替スロットを選択
+                        selected_alternatives = clean_alternatives[:3]
+                        slots_text = "\n".join([f"- {slot}" for slot in selected_alternatives])
                         additional_info_text = f"\n\n# 日程提案\n{schedule_suggestion['message']}\n\n代替日程候補:\n{slots_text}"
+                        
+                        # schedule_suggestionの内容も更新
+                        schedule_suggestion["alternative_slots"] = clean_alternatives
                     else:
                         additional_info_text = f"\n\n# 日程提案\n{schedule_suggestion['message']}"
-                
-                # 利用可能なすべてのスロットも追加（参考情報として）
-                all_slots_text = "\n".join([f"- {slot}" for slot in available_slots])
-                additional_info_text += f"\n\n# 利用可能な日時スロット（参考）\n以下の日時が空いています：\n{all_slots_text}"
                 
                 # 追加情報を設定
                 additional_info = {
                     "type": "カレンダー",
-                    "available_slots": available_slots,
                     "schedule_suggestion": schedule_suggestion
                 }
             
@@ -196,6 +231,11 @@ class ClaudeResponseProcessor:
         details_pattern = r'<必要情報>.*?<詳細>(.*?)</詳細>.*?</必要情報>'
         details_match = re.search(details_pattern, text, re.DOTALL)
         
+        # 本文を抽出
+        body_pattern = r'<本文>(.*?)</本文>'
+        body_match = re.search(body_pattern, text, re.DOTALL)
+        email_body = body_match.group(1).strip() if body_match else ""
+        
         # 日程候補を抽出（カレンダー情報の場合）
         date_suggestions = []
         date_pattern = r'<日程候補>(.*?)</日程候補>'
@@ -205,6 +245,54 @@ class ClaudeResponseProcessor:
             suggestion_pattern = r'<候補>(.*?)</候補>'
             date_suggestions = re.findall(suggestion_pattern, date_content, re.DOTALL)
             date_suggestions = [suggestion.strip() for suggestion in date_suggestions]
+            
+            # 時間範囲が含まれていない場合、メール本文から補完
+            if email_body and date_suggestions:
+                # 日付と時間範囲のパターン
+                date_time_range_patterns = [
+                    r'(\d{1,2}月\d{1,2}日).*?(\d{1,2}:\d{2})[-〜~](\d{1,2}:\d{2})',  # 4月10日21:00〜23:00
+                    r'(\d{1,2}/\d{1,2}).*?(\d{1,2}:\d{2})[-〜~](\d{1,2}:\d{2})',     # 4/10 21:00-23:00
+                ]
+                
+                # 各日程候補について時間範囲を確認
+                enhanced_suggestions = []
+                for suggestion in date_suggestions:
+                    # 既に時間範囲が含まれている場合はそのまま使用
+                    if re.search(r'\d{1,2}:\d{2}-\d{1,2}:\d{2}', suggestion):
+                        enhanced_suggestions.append(suggestion)
+                        continue
+                    
+                    # 日付部分を抽出
+                    date_part = re.search(r'(\d{1,2}月\d{1,2}日|\d{1,2}/\d{1,2})', suggestion)
+                    if not date_part:
+                        enhanced_suggestions.append(suggestion)
+                        continue
+                    
+                    date_str = date_part.group(1)
+                    time_range_found = False
+                    
+                    # メール本文から対応する時間範囲を検索
+                    for pattern in date_time_range_patterns:
+                        for match in re.finditer(pattern, email_body):
+                            if date_str in match.group(1) or match.group(1) in date_str:
+                                start_time = match.group(2)
+                                end_time = match.group(3)
+                                # 時間範囲を含む形式に変換
+                                enhanced_suggestion = suggestion.replace(date_str, f"{date_str} {start_time}-{end_time}")
+                                enhanced_suggestions.append(enhanced_suggestion)
+                                time_range_found = True
+                                break
+                        if time_range_found:
+                            break
+                    
+                    # 時間範囲が見つからなかった場合は元の候補を使用
+                    if not time_range_found:
+                        enhanced_suggestions.append(suggestion)
+                
+                # 拡張された日程候補で置き換え
+                if enhanced_suggestions:
+                    date_suggestions = enhanced_suggestions
+            
             logger.info(f"抽出された日程候補: {date_suggestions}")
         
         if type_match:
