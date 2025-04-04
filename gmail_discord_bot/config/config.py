@@ -24,8 +24,8 @@ OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4")  # デフォルトはGPT-4
 CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-3-sonnet-20240229")  # デフォルトはClaude 3 Sonnet
 
 # システムプロンプト設定
-EMAIL_ANALYZER_PROMPT_FILE = config_dir / "email_analyzer_prompt.txt"
-EMAIL_RESPONDER_PROMPT_FILE = config_dir / "email_responder_prompt.txt"
+EMAIL_ANALYZER_PROMPT_FILE = config_dir / "01_email_analyzer_prompt.txt"
+EMAIL_RESPONDER_PROMPT_FILE = config_dir / "02_email_responder_prompt.txt"
 
 # Google Calendar API設定
 CALENDAR_CREDENTIALS_FILE = config_dir / os.getenv("CALENDAR_CREDENTIALS_FILE")
