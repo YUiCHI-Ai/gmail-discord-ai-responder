@@ -72,13 +72,15 @@ class ClaudeResponseProcessor:
                 "required_info": {"type": None}
             }
     
-    async def generate_responses(self, prompt, analysis_result=None, num_responses=1, email_id=None):
+    async def generate_responses(self, prompt, analysis_result=None, num_responses=1, email_id=None, additional_info=None):
         """Claude APIを使用して返信を生成"""
         try:
-            # 追加情報の取得
-            additional_info = {}
+            # 追加情報の初期化
+            if additional_info is None:
+                additional_info = {}
             additional_info_text = ""
             
+            # カレンダー情報の処理
             if analysis_result and analysis_result.get("required_info", {}).get("type") == "カレンダー":
                 # カレンダー情報が必要な場合、利用可能なスロットを取得
                 available_slots = self.schedule_analyzer.get_available_slots()
@@ -151,6 +153,17 @@ class ClaudeResponseProcessor:
                     "type": "カレンダー",
                     "schedule_suggestion": schedule_suggestion
                 }
+            
+            # 承認情報の処理
+            elif "type" in additional_info and additional_info["type"] == "承認":
+                # 承認結果をテキストに変換
+                decision = additional_info.get("decision", "")
+                if decision == "approve":
+                    additional_info_text = "\n\n# 承認情報\n承認結果: 承認されました"
+                elif decision == "reject":
+                    additional_info_text = "\n\n# 承認情報\n承認結果: 拒否されました"
+                
+                logger.info(f"承認情報を追加: {decision}")
             
             # 返信生成用のシステムプロンプトを取得
             system_prompt = config.get_email_responder_prompt()

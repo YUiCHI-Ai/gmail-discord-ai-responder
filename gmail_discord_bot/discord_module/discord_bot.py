@@ -4,8 +4,37 @@ import asyncio
 from async_timeout import timeout as async_timeout
 from ..config import config
 from ..utils.logger import setup_logger
+from discord import ui, ButtonStyle
 
 logger = setup_logger(__name__)
+
+class ApprovalView(ui.View):
+    def __init__(self, email_id, timeout=None):
+        super().__init__(timeout=timeout)
+        self.email_id = email_id
+        self.result = None
+    
+    def __init__(self, email_id, bot, timeout=None):
+        super().__init__(timeout=timeout)
+        self.email_id = email_id
+        self.bot = bot
+        self.result = None
+    
+    @ui.button(label="承認する", style=ButtonStyle.success, custom_id="approve")
+    async def approve_button(self, interaction: discord.Interaction, button: ui.Button):
+        await interaction.response.send_message(f"メール {self.email_id} を承認しました。返信を生成します...")
+        self.result = "approve"
+        # 承認イベントを発火
+        self.bot.dispatch('approval_decision', self.email_id, "approve")
+        self.stop()
+    
+    @ui.button(label="拒否する", style=ButtonStyle.danger, custom_id="reject")
+    async def reject_button(self, interaction: discord.Interaction, button: ui.Button):
+        await interaction.response.send_message(f"メール {self.email_id} を拒否しました。")
+        self.result = "reject"
+        # 拒否イベントを発火
+        self.bot.dispatch('approval_decision', self.email_id, "reject")
+        self.stop()
 
 class DiscordBot:
     def __init__(self):
@@ -21,6 +50,8 @@ class DiscordBot:
         
         # 応答選択のためのデータ保存
         self.response_options = {}
+        # 承認リクエストのためのデータ保存
+        self.approval_requests = {}
     
     def setup_events(self):
         """イベントハンドラの設定"""
@@ -52,13 +83,30 @@ class DiscordBot:
         @self.bot.command(name='approve')
         async def approve_request(ctx, email_id: str):
             """承認リクエストを承認"""
+            if email_id not in self.approval_requests:
+                await ctx.send(f"メール {email_id} の承認リクエストが見つかりません。")
+                return
+                
+            # 承認情報を保存
+            self.approval_requests[email_id]['result'] = "approve"
             await ctx.send(f"メール {email_id} を承認しました。返信を生成します...")
-            # ここで承認後の処理を実装（返信生成など）
+            
+            # 承認イベントを発火（メインプログラムで処理）
+            self.bot.dispatch('approval_decision', email_id, "approve")
             
         @self.bot.command(name='reject')
         async def reject_request(ctx, email_id: str):
             """承認リクエストを拒否"""
+            if email_id not in self.approval_requests:
+                await ctx.send(f"メール {email_id} の承認リクエストが見つかりません。")
+                return
+                
+            # 拒否情報を保存
+            self.approval_requests[email_id]['result'] = "reject"
             await ctx.send(f"メール {email_id} を拒否しました。")
+            
+            # 拒否イベントを発火（メインプログラムで処理）
+            self.bot.dispatch('approval_decision', email_id, "reject")
             
         @self.bot.command(name='handle')
         async def handle_other_info(ctx, email_id: str, *, action: str):
@@ -211,7 +259,19 @@ class DiscordBot:
                 color=discord.Color.orange()
             )
             
-            await channel.send(embed=embed)
+            # ボタン付きのビューを作成
+            view = ApprovalView(email_data['id'], self.bot, timeout=86400)  # 24時間のタイムアウト
+            
+            # 承認リクエストを保存
+            self.approval_requests[email_data['id']] = {
+                'email_data': email_data,
+                'channel_id': channel_id,
+                'view': view,
+                'result': None
+            }
+            
+            # メッセージを送信
+            await channel.send(embed=embed, view=view)
             logger.info(f"チャンネル {channel_id} への承認リクエスト送信完了")
             return True
         except Exception as e:

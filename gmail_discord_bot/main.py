@@ -160,11 +160,14 @@ class EmailBot:
                     logger.log_flow(FlowStep.REQUEST_APPROVAL, "ユーザーに承認を求める")
                     
                     # 承認リクエストをDiscordに送信
-                    approval_message = f"**承認リクエスト**\n\nこのメールには承認が必要です。\n\n{required_info_details}\n\n承認するには `!approve {email_data['id']}` を、拒否するには `!reject {email_data['id']}` を入力してください。"
+                    approval_message = f"**承認リクエスト**\n\nこのメールには承認が必要です。\n\n{required_info_details}\n\n以下のボタンで承認または拒否してください。"
                     
                     try:
                         async with async_timeout(15):
                             await self.discord_bot.send_approval_request(channel_id, email_data, approval_message)
+                            
+                            # 承認イベントハンドラを設定
+                            self._setup_approval_handler(email_data, analysis_result, prompt, channel_id)
                     except asyncio.TimeoutError:
                         logger.error("承認リクエストの送信がタイムアウトしました")
                     
@@ -266,6 +269,53 @@ class EmailBot:
             logger.error(f"詳細なエラー情報: {traceback.format_exc()}")
             if email_data['id'] in self.processing_emails:
                 self.processing_emails.remove(email_data['id'])
+    
+    def _setup_approval_handler(self, email_data, analysis_result, prompt, channel_id):
+        """承認イベントハンドラを設定"""
+        email_id = email_data['id']
+        
+        @self.discord_bot.bot.event
+        async def on_approval_decision(decided_email_id, decision):
+            """承認または拒否の決定を処理"""
+            if decided_email_id != email_id:
+                return  # 他のメールの承認イベントは無視
+                
+            logger.info(f"メール {email_id} の承認決定を受信: {decision}")
+            
+            # 承認情報を追加
+            additional_info = {
+                "type": "承認",
+                "decision": decision
+            }
+            
+            # 承認情報をプロンプトに追加
+            approval_info = f"\n\n# 承認情報\n承認結果: {decision}"
+            full_prompt = f"{prompt}\n\n# メール分析結果\n{analysis_result.get('analysis', '')}{approval_info}"
+            
+            try:
+                # 返信を生成
+                logger.log_flow(FlowStep.GENERATE_RESPONSE, "AIで返信を生成")
+                async with async_timeout(60):
+                    responses = await self.response_processor.generate_responses(
+                        full_prompt,
+                        analysis_result,
+                        email_id=email_id,
+                        additional_info=additional_info
+                    )
+                
+                # 返信候補をDiscordに送信
+                logger.log_flow(FlowStep.DISPLAY_RESPONSE, "Discordに返信を表示")
+                async with async_timeout(30):
+                    success = await self.discord_bot.send_response_options(channel_id, email_data, responses)
+                    if not success:
+                        logger.error(f"返信候補の送信に失敗しました: チャンネルID {channel_id}")
+                        return
+            except asyncio.TimeoutError:
+                logger.error("AI応答生成または送信がタイムアウトしました")
+            except Exception as e:
+                logger.error(f"承認後の処理でエラーが発生しました: {e}")
+                import traceback
+                logger.error(f"詳細なエラー情報: {traceback.format_exc()}")
     
     def _extract_urls_from_email(self, email_body):
         """メール本文からURLを抽出"""

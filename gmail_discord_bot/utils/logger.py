@@ -19,6 +19,9 @@ class FlowStep(Enum):
     EDIT_RESPONSE = auto()           # ユーザーによる編集
     SEND_RESPONSE = auto()           # ユーザーによる送信
     SEND_EMAIL = auto()              # Gmailで返信メール送信
+    REQUEST_APPROVAL = auto()        # 承認リクエスト
+    REQUEST_CONFIRMATION = auto()    # 確認リクエスト
+    REQUEST_OTHER_INFO = auto()      # その他情報リクエスト
     COMPLETE = auto()                # 処理完了
 
 class FlowFormatter(logging.Formatter):
