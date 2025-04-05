@@ -554,12 +554,4 @@ class DiscordBot:
             logger.error(f"その他情報リクエスト送信エラー: {e}")
             return False
     
-    def run_async(self):
-        """非同期でボットを実行（テスト用）"""
-        loop = asyncio.get_event_loop()
-        try:
-            loop.create_task(self.bot.start(self.token))
-        except KeyboardInterrupt:
-            loop.run_until_complete(self.bot.close())
-        finally:
-            loop.close()
+    # テスト用メソッドを削除しました

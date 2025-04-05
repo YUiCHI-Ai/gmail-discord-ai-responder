@@ -29,7 +29,6 @@ class CalendarClient:
             except (EOFError, pickle.UnpicklingError) as e:
                 logger.error(f"カレンダートークンの読み込みに失敗しました: {e}")
                 self.creds = None
-                self.creds = pickle.load(token)
         
         # 認証情報がない、または期限切れの場合
         if not self.creds or not self.creds.valid:
