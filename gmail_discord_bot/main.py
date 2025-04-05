@@ -201,9 +201,26 @@ class EmailBot:
                         except asyncio.TimeoutError:
                             logger.error("エラーメッセージの送信がタイムアウトしました")
                     
-                    # 確認待ちの状態なので、ここで処理を終了
-                    logger.info(f"メール {email_data['id']} は確認待ちです")
-                    return
+                    # 添付ファイルとURLの情報を含むadditional_infoを作成
+                    additional_info = {
+                        "type": "確認",
+                        "attachments": attachments,
+                        "urls": urls
+                    }
+                    
+                    # 返信を生成
+                    logger.log_flow(FlowStep.GENERATE_RESPONSE, "AIで返信を生成")
+                    try:
+                        async with async_timeout(60):  # 60秒のタイムアウト（AI生成は時間がかかる可能性がある）
+                            responses = await self.response_processor.generate_responses(
+                                prompt,
+                                analysis_result,
+                                email_id=email_data['id'],
+                                additional_info=additional_info
+                            )
+                    except asyncio.TimeoutError:
+                        logger.error("AI応答生成がタイムアウトしました")
+                        return
                 
                 elif required_info_type == "その他":
                     # その他の情報が必要な場合、ユーザーに対処法を提案

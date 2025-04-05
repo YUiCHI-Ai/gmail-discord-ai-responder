@@ -282,6 +282,8 @@ class DiscordBot:
         """添付ファイルとURLをDiscordチャンネルに送信"""
         logger.info(f"send_attachments_and_urls: チャンネルID {channel_id} へ添付ファイルとURLを送信開始")
         try:
+            import io
+            
             channel = self.bot.get_channel(int(channel_id))
             if not channel:
                 logger.error(f"チャンネルが見つかりません: {channel_id}")
@@ -298,21 +300,38 @@ class DiscordBot:
             
             # 添付ファイルを送信
             for attachment in attachments:
-                file = discord.File(
-                    fp=attachment['data'],
-                    filename=attachment['filename']
-                )
-                await channel.send(f"添付ファイル: {attachment['filename']} ({attachment['mime_type']})", file=file)
+                try:
+                    # バイナリデータをBytesIOオブジェクトに変換
+                    file_data = io.BytesIO(attachment['data'])
+                    file_data.seek(0)  # ファイルポインタを先頭に戻す
+                    
+                    # ファイル名とMIMEタイプをログに出力
+                    logger.info(f"添付ファイル送信: {attachment['filename']} ({attachment['mime_type']}) サイズ: {attachment['size']} バイト")
+                    
+                    # Discord.Fileオブジェクトを作成
+                    file = discord.File(
+                        fp=file_data,
+                        filename=attachment['filename']
+                    )
+                    
+                    # ファイルを送信
+                    await channel.send(f"添付ファイル: {attachment['filename']} ({attachment['mime_type']})", file=file)
+                    logger.info(f"添付ファイル {attachment['filename']} の送信に成功しました")
+                except Exception as file_error:
+                    logger.error(f"添付ファイル {attachment['filename']} の送信に失敗しました: {file_error}")
             
             # URLを送信
             if urls:
                 url_message = "**メール内のURL:**\n" + "\n".join(urls)
                 await channel.send(url_message)
+                logger.info(f"{len(urls)}件のURLを送信しました")
             
             logger.info(f"チャンネル {channel_id} への添付ファイルとURL送信完了")
             return True
         except Exception as e:
             logger.error(f"添付ファイルとURL送信エラー: {e}")
+            import traceback
+            logger.error(f"詳細なエラー情報: {traceback.format_exc()}")
             return False
     
     async def send_other_info_request(self, channel_id, email_data, message):

@@ -165,6 +165,28 @@ class ClaudeResponseProcessor:
                 
                 logger.info(f"承認情報を追加: {decision}")
             
+            # 確認情報の処理
+            elif analysis_result and analysis_result.get("required_info", {}).get("type") == "確認":
+                # 添付ファイルとURLの情報を取得
+                attachments = additional_info.get("attachments", [])
+                urls = additional_info.get("urls", [])
+                
+                # 添付ファイル情報をテキストに変換
+                attachments_text = ""
+                if attachments:
+                    attachments_text = "\n".join([f"- {attachment['filename']} ({attachment['mime_type']})" for attachment in attachments])
+                    attachments_text = f"\n\n# 添付ファイル\n{attachments_text}"
+                
+                # URL情報をテキストに変換
+                urls_text = ""
+                if urls:
+                    urls_text = "\n".join([f"- {url}" for url in urls])
+                    urls_text = f"\n\n# URL\n{urls_text}"
+                
+                additional_info_text = f"{attachments_text}{urls_text}"
+                
+                logger.info(f"確認情報を追加: 添付ファイル {len(attachments)}件, URL {len(urls)}件")
+            
             # 返信生成用のシステムプロンプトを取得
             system_prompt = config.get_email_responder_prompt()
             
