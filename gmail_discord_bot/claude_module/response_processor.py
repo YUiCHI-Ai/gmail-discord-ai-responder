@@ -197,8 +197,16 @@ class ClaudeResponseProcessor:
             email = signature_settings.get("email")
             url = signature_settings.get("url")
             
-            # 署名情報をプロンプトに追加
-            signature_info = f"\n\n# 署名情報\n会社名: {company_name}\n名前: {name}\nEmail: {email}\nURL: {url}"
+            # 署名情報をプロンプトに追加（フォーマット済み）
+            signature_info = f"""
+
+# 署名情報
+───────────────────
+{company_name}
+{name}
+Email：{email}
+URL: {url}
+───────────────────"""
             
             # 分析結果を含めたプロンプトを作成
             full_prompt = prompt
