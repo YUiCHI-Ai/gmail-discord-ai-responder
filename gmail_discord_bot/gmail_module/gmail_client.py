@@ -67,6 +67,7 @@ class GmailClient:
     def _parse_message(self, message):
         """メッセージをパース"""
         msg_id = message['id']
+        thread_id = message.get('threadId', '')
         payload = message['payload']
         headers = payload.get('headers', [])
         
@@ -74,6 +75,9 @@ class GmailClient:
         subject = ""
         sender = ""
         date = ""
+        message_id = ""
+        references = ""
+        in_reply_to = ""
         
         for header in headers:
             name = header.get('name', '').lower()
@@ -83,6 +87,15 @@ class GmailClient:
                 sender = header.get('value', '')
             elif name == 'date':
                 date = header.get('value', '')
+            elif name == 'message-id':
+                message_id = header.get('value', '')
+                # <...@...> 形式から内部のIDだけを抽出
+                if message_id.startswith('<') and '>' in message_id:
+                    message_id = message_id.strip('<>').split('@')[0]
+            elif name == 'references':
+                references = header.get('value', '')
+            elif name == 'in-reply-to':
+                in_reply_to = header.get('value', '')
         
         # 本文を取得
         body = ""
@@ -99,10 +112,14 @@ class GmailClient:
         
         return {
             'id': msg_id,
+            'thread_id': thread_id,
             'subject': subject,
             'sender': sender,
             'date': date,
             'body': body,
+            'message_id': message_id,
+            'references': references,
+            'in_reply_to': in_reply_to,
             'raw_message': message
         }
     
@@ -160,23 +177,139 @@ class GmailClient:
             logger.error(f"添付ファイル取得エラー: {e}")
             return []
     
-    def send_email(self, to, subject, body, thread_id=None):
-        """メールを送信する"""
+    def get_thread_list(self, user_id='me', query='', max_results=10):
+        """スレッドリストを取得する
+        
+        Args:
+            user_id: ユーザーID（通常は'me'）
+            query: 検索クエリ（例: 'in:sent'）
+            max_results: 最大結果数
+            
+        Returns:
+            スレッドリスト
+        """
         try:
+            thread_list = self.service.users().threads().list(
+                userId=user_id, q=query, maxResults=max_results).execute().get('threads', [])
+            logger.info(f"{len(thread_list)}件のスレッドを取得しました")
+            return thread_list
+        except Exception as e:
+            logger.error(f"スレッド取得エラー: {e}")
+            return []
+    
+    def get_thread(self, thread_id, user_id='me'):
+        """スレッドの詳細を取得する
+        
+        Args:
+            thread_id: スレッドID
+            user_id: ユーザーID（通常は'me'）
+            
+        Returns:
+            スレッド情報
+        """
+        try:
+            thread = self.service.users().threads().get(
+                userId=user_id, id=thread_id).execute()
+            logger.info(f"スレッド {thread_id} の詳細を取得しました")
+            return thread
+        except Exception as e:
+            logger.error(f"スレッド詳細取得エラー: {e}")
+            return None
+    
+    def send_email(self, to, subject, body, thread_id=None, message_id=None, references=None, quote_original=False):
+        """メールを送信する
+        
+        Args:
+            to: 送信先メールアドレス
+            subject: 件名
+            body: 本文
+            thread_id: スレッドID（返信の場合）
+            message_id: 返信元メッセージID（返信の場合）
+            references: 参照メッセージID（返信の場合）
+            quote_original: 元のメッセージを引用するかどうか
+            
+        Returns:
+            送信成功時: 送信結果の辞書
+            送信失敗時: None
+        """
+        try:
+            # 元のメッセージを引用する場合
+            original_message_body = ""
+            if quote_original and thread_id and message_id:
+                try:
+                    # スレッドを取得して最新のメッセージを取得
+                    thread = self.get_thread(thread_id)
+                    if thread and 'messages' in thread:
+                        # スレッド内の最新メッセージを探す
+                        for msg in thread['messages']:
+                            msg_headers = msg['payload']['headers']
+                            for header in msg_headers:
+                                if header['name'] == 'Message-Id' and message_id in header['value']:
+                                    # メッセージの本文を取得
+                                    if 'parts' in msg['payload']:
+                                        for part in msg['payload']['parts']:
+                                            if part['mimeType'] == 'text/plain':
+                                                original_message_body = base64.urlsafe_b64decode(
+                                                    part['body']['data']).decode('utf-8')
+                                                break
+                                    elif 'body' in msg['payload'] and 'data' in msg['payload']['body']:
+                                        original_message_body = base64.urlsafe_b64decode(
+                                            msg['payload']['body']['data']).decode('utf-8')
+                                    break
+                    
+                    # 元のメッセージを引用形式に変換
+                    if original_message_body:
+                        quoted_body = ""
+                        for line in original_message_body.splitlines():
+                            quoted_body += f"> {line}\n"
+                        
+                        # 引用を本文に追加
+                        body = f"{body}\n\n{quoted_body}"
+                        logger.info("元のメッセージを引用形式で追加しました")
+                except Exception as e:
+                    logger.error(f"メッセージ引用処理エラー: {e}")
+            
+            # メッセージオブジェクトの作成
             message = email.message.EmailMessage()
             message['To'] = to
             message['Subject'] = subject
-            message.set_content(body)
+            message['From'] = self.get_user_email()  # 送信者のメールアドレスを設定
             
+            # 返信ヘッダーの設定（返信の場合）
+            if message_id:
+                # 完全なメッセージIDを作成（<>形式を保持）
+                full_message_id = message_id
+                if not (message_id.startswith('<') and message_id.endswith('>')):
+                    full_message_id = f"<{message_id}@mail.gmail.com>"
+                
+                # In-Reply-To ヘッダーを設定
+                message['In-Reply-To'] = full_message_id
+                logger.info(f"In-Reply-To ヘッダーを設定: {full_message_id}")
+                
+                # References ヘッダーを設定
+                if references:
+                    message['References'] = f"{references} {full_message_id}"
+                else:
+                    message['References'] = full_message_id
+                logger.info(f"References ヘッダーを設定: {message['References']}")
+            
+            # 本文を設定（文字コードを明示的に指定）
+            message.set_content(body, subtype='plain', charset='UTF-8')
+            
+            # メッセージをエンコード
             encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
             
+            # 送信用メッセージを作成
             create_message = {
                 'raw': encoded_message
             }
             
+            # スレッドIDがあれば指定
             if thread_id:
                 create_message['threadId'] = thread_id
+                logger.info(f"スレッドID {thread_id} を指定してメールを送信します")
             
+            # メールを送信
             send_message = self.service.users().messages().send(
                 userId='me', body=create_message).execute()
             
@@ -185,4 +318,66 @@ class GmailClient:
         
         except Exception as e:
             logger.error(f"メール送信エラー: {e}")
+            import traceback
+            logger.error(f"詳細なエラー情報: {traceback.format_exc()}")
             return None
+    
+    def get_user_email(self):
+        """現在認証されているユーザーのメールアドレスを取得"""
+        try:
+            profile = self.service.users().getProfile(userId='me').execute()
+            return profile['emailAddress']
+        except Exception as e:
+            logger.error(f"ユーザープロファイル取得エラー: {e}")
+            import traceback
+            logger.error(f"詳細なエラー情報: {traceback.format_exc()}")
+            return None
+    
+    def test_send_email(self, to=None):
+        """テスト用のメール送信機能
+        
+        引数:
+            to: 送信先メールアドレス（指定がない場合は自分自身に送信）
+        
+        戻り値:
+            成功時: 送信結果の辞書
+            失敗時: None
+        """
+        try:
+            # 送信先が指定されていない場合は自分自身に送信
+            if not to:
+                to = self.get_user_email()
+                if not to:
+                    logger.error("送信先メールアドレスが取得できませんでした")
+                    return None
+            
+            # テストメールの内容
+            subject = "Gmail API テストメール"
+            body = (
+                "これはGmail APIのテストメールです。\n\n"
+                "このメールが届いた場合、Gmail APIの設定は正常です。\n"
+                f"送信時刻: {import_time().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                "このメールは自動送信されています。"
+            )
+            
+            # メール送信
+            result = self.send_email(to=to, subject=subject, body=body)
+            
+            if result:
+                logger.info(f"テストメール送信成功: {result['id']}")
+                return result
+            else:
+                logger.error("テストメール送信失敗")
+                return None
+                
+        except Exception as e:
+            logger.error(f"テストメール送信エラー: {e}")
+            import traceback
+            logger.error(f"詳細なエラー情報: {traceback.format_exc()}")
+            return None
+
+# 時間モジュールをインポート
+def import_time():
+    """時間モジュールをインポート（遅延インポート）"""
+    import datetime
+    return datetime.datetime.now()
