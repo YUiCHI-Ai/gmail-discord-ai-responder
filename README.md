@@ -29,7 +29,8 @@
 
 このシステムを使用するには、以下のAPIキーと認証情報が必要です：
 
-#### 1.1 Google Cloud Platform（Gmail APIとGoogleカレンダーAPI）
+<details>
+<summary><b>1.1 Google Cloud Platform（Gmail APIとGoogleカレンダーAPI）</b></summary>
 
 1. [Google Cloud Console](https://console.cloud.google.com/)にアクセスし、Googleアカウントでログイン
 2. 新しいプロジェクトを作成（右上のプロジェクト選択 → 「新しいプロジェクト」）
@@ -55,8 +56,10 @@
 14. ダウンロードボタンをクリックして認証情報（JSON）をダウンロード
 15. ダウンロードしたファイルの名前を「credentials.json」に変更し、`gmail_discord_bot/config/`ディレクトリに配置
 16. 同じファイルをコピーして「calendar_credentials.json」という名前で同じディレクトリに配置
+</details>
 
-#### 1.2 Discord Bot Token
+<details>
+<summary><b>1.2 Discord Bot Token</b></summary>
 
 1. [Discord Developer Portal](https://discord.com/developers/applications)にアクセス
 2. 「New Application」をクリックし、アプリケーション名を入力して作成
@@ -75,20 +78,25 @@
 9. 生成されたURLをコピーしてブラウザで開き、ボットを追加したいDiscordサーバーを選択
 10. サーバーのIDをコピー（後で`.env`ファイルに設定）
     - サーバーIDを取得するには、Discordの設定で開発者モードを有効にし、サーバー名を右クリックして「IDをコピー」を選択
+</details>
 
-#### 1.3 OpenAI API（ChatGPT）
+<details>
+<summary><b>1.3 OpenAI API（ChatGPT）</b></summary>
 
 1. [OpenAIのウェブサイト](https://platform.openai.com/)にアクセスし、アカウントを作成またはログイン
 2. 右上のプロファイルアイコンをクリックし、「View API keys」を選択
 3. 「Create new secret key」をクリックし、新しいAPIキーを生成
 4. 生成されたAPIキーをコピー（このキーは後で`.env`ファイルに設定）
+</details>
 
-#### 1.4 Claude API
+<details>
+<summary><b>1.4 Claude API</b></summary>
 
 1. [Anthropicのウェブサイト](https://console.anthropic.com/)にアクセスし、アカウントを作成またはログイン
 2. 「API Keys」セクションに移動
 3. 「Create API Key」をクリックし、新しいAPIキーを生成
 4. 生成されたAPIキーをコピー（このキーは後で`.env`ファイルに設定）
+</details>
 
 ### 2. リポジトリのクローンとセットアップ
 
@@ -123,11 +131,13 @@ python setup_config.py
 - `email_channel_mapping.json` - メールとDiscordチャンネルのマッピング
 - `email_settings.json` - メール署名とカレンダー設定
 
-#### 手動セットアップ（詳細設定）
+<details>
+<summary><b>手動セットアップ（詳細設定）</b></summary>
 
 自動セットアップを使用しない場合は、以下の手順で手動で設定ファイルを作成できます。
 
-##### 3.1 環境変数の設定
+<details>
+<summary><b>3.1 環境変数の設定</b></summary>
 
 `.env.example`ファイルをコピーして`.env`ファイルを作成し、必要な情報を設定します：
 
@@ -171,8 +181,10 @@ EMAIL_CHANNEL_MAPPING_FILE=email_channel_mapping.json
 - `your_discord_guild_id`: ボットを追加したDiscordサーバーのID
 - `your_openai_api_key`: OpenAIで生成したAPIキー
 - `your_claude_api_key`: Anthropicで生成したAPIキー
+</details>
 
-##### 3.2 メールとチャンネルのマッピング設定
+<details>
+<summary><b>3.2 メールとチャンネルのマッピング設定</b></summary>
 
 `email_channel_mapping.json.example`ファイルをコピーして`email_channel_mapping.json`ファイルを作成します：
 
@@ -204,8 +216,10 @@ cp gmail_discord_bot/config/email_channel_mapping.json.example gmail_discord_bot
 - `company`: 送信者の会社名（空でも可）
 - `discord_channel_id`: 対応するDiscordチャンネルのID
   - チャンネルIDを取得するには、Discordの設定で開発者モードを有効にし、チャンネル名を右クリックして「IDをコピー」を選択
+</details>
 
-##### 3.3 メール設定の確認
+<details>
+<summary><b>3.3 メール設定の確認</b></summary>
 
 `email_settings.json`ファイルを確認し、必要に応じて編集します：
 
@@ -239,12 +253,17 @@ cp gmail_discord_bot/config/email_channel_mapping.json.example gmail_discord_bot
   - `name`: 名前
   - `email`: メールアドレス
   - `url`: ウェブサイトURL
+</details>
+</details>
 
 ### 4. 初回実行と認証
 
 ```bash
 python -m gmail_discord_bot.main
 ```
+
+<details>
+<summary><b>初回実行時の認証手順</b></summary>
 
 初回実行時は、ブラウザが自動的に開き、以下の認証が求められます：
 
@@ -258,6 +277,7 @@ python -m gmail_discord_bot.main
    - 認証が完了すると`calendar_token.json`ファイルが生成されます
 
 認証が完了すると、Discordボットが起動し、新しいメールの監視が始まります。
+</details>
 
 ## 💬 使用方法
 
@@ -277,7 +297,8 @@ python -m gmail_discord_bot.main
 
 ## 🔧 初期設定のトラブルシューティング
 
-### Gmail API認証エラー
+<details>
+<summary><b>Gmail API認証エラー</b></summary>
 
 **問題**: Gmail APIの認証に失敗する
 
@@ -286,8 +307,10 @@ python -m gmail_discord_bot.main
 2. Google Cloud Consoleで正しいスコープが設定されているか確認
 3. `token.json`ファイルを削除して再認証を試みる
 4. OAuth同意画面でテストユーザーとして自分のメールアドレスが追加されているか確認
+</details>
 
-### Discord接続エラー
+<details>
+<summary><b>Discord接続エラー</b></summary>
 
 **問題**: Discordボットが接続できない
 
@@ -296,8 +319,10 @@ python -m gmail_discord_bot.main
 2. ボットに必要な権限が付与されているか確認
 3. DISCORD_GUILD_IDが正しいか確認
 4. MESSAGE CONTENT INTENTが有効になっているか確認
+</details>
 
-### AI API接続エラー
+<details>
+<summary><b>AI API接続エラー</b></summary>
 
 **問題**: AI APIに接続できない
 
@@ -306,8 +331,10 @@ python -m gmail_discord_bot.main
 2. DEFAULT_AI_PROVIDERが正しく設定されているか確認（`chatgpt`または`claude`）
 3. インターネット接続を確認
 4. APIキーの利用制限に達していないか確認
+</details>
 
-### メールチャンネルマッピングエラー
+<details>
+<summary><b>メールチャンネルマッピングエラー</b></summary>
 
 **問題**: メールがDiscordに転送されない
 
@@ -315,6 +342,7 @@ python -m gmail_discord_bot.main
 1. `email_channel_mapping.json`ファイルが正しく設定されているか確認
 2. Discordチャンネルが存在し、ボットがアクセスできるか確認
 3. メールアドレスのパターンが正しいか確認
+</details>
 
 ## 📄 ライセンス
 
