@@ -1,215 +1,62 @@
 # Gmail-Discord自動転送・返信システム
 
-## 概要
+![バージョン](https://img.shields.io/badge/バージョン-1.0.0-blue)
+![ライセンス](https://img.shields.io/badge/ライセンス-Apache%202.0-green)
+![Python](https://img.shields.io/badge/Python-3.8%2B-yellow)
+
+## 📋 概要
 
 このシステムは、Gmailで受信したメールをDiscordに自動転送し、AIを活用して最適な返信文を生成するツールです。ChatGPTまたはClaude APIを利用して、メール内容を分析し、送信元情報から適切な宛名（〇〇会社 〇〇様）を自動設定します。日程調整が必要なメールの場合は、Googleカレンダーと連携して空き時間を確認し、候補日時を含む返信を提案します。
 
 **対象ユーザー**: このシステムは、多数のビジネスメールを効率的に管理し、返信作業を自動化したいチームや個人に最適です。特に、日程調整や定型的な返信が多い業務環境での利用に適しています。
 
-[ざっくり説明書はこちら](https://claude.site/artifacts/a7cb17a6-755a-40e7-9856-a3190ded2948)
+[ざっくり説明書はこちら](https://claude.site/artifacts/efd0d8d8-a30c-4d99-842b-684d509efe6d)
 
-## 目次
+[開発者向けドキュメントはこちら](DEVELOPER.md)
 
-1. [機能概要](#機能概要)
-2. [クイックスタート](#クイックスタート)
-3. [システム要件](#システム要件)
-4. [インストール手順](#インストール手順)
-5. [API料金プラン](#api料金プラン)
-6. [API設定ガイド](#api設定ガイド)
-   - [Gmail API設定](#gmail-api設定)
-   - [Discord API設定](#discord-api設定)
-   - [OpenAI API設定](#openai-api設定)
-   - [Claude API設定](#claude-api設定)
-   - [Googleカレンダー API設定](#googleカレンダー-api設定)
-7. [設定ファイルの作成](#設定ファイルの作成)
-   - [環境変数の設定](#環境変数の設定)
-   - [メールとチャンネルのマッピング](#メールとチャンネルのマッピング)
-8. [実行方法](#実行方法)
-9. [使用方法](#使用方法)
-   - [Discordコマンド一覧](#discordコマンド一覧)
-   - [Discordボタン操作](#discordボタン操作)
-   - [メール処理フロー](#メール処理フロー)
-   - [処理フロー図](#処理フロー図)
-10. [プロジェクト構造](#プロジェクト構造)
-11. [トラブルシューティング](#トラブルシューティング)
-12. [よくある質問（FAQ）](#よくある質問faq)
-13. [ライセンス](#ライセンス)
-
-## 機能概要
-
-このセクションでは、システムの主要機能について説明します。
+## ✨ 主な機能
 
 - **メール自動転送**: Gmailで受信したメールを送信元のメールアドレスごとに対応するDiscordチャンネルへ自動転送
 - **宛名自動設定**: 送信元情報から会社名・担当者名を抽出し、「〇〇会社 〇〇様」の形式で自動設定
-- **2段階AI処理**:
-  1. メール分析: AIがメール内容を分析し、必要な追加情報のタイプを特定
-  2. 返信生成: 分析結果と追加情報を基に最適な返信を生成
-- **カレンダー連携**: 日程調整が必要と判断された場合、GoogleカレンダーAPIと連携して利用可能なスロットを取得し、適切な候補日時を含む返信を生成
-- **XML形式出力**: AIの出力を構造化されたXML形式で処理し、分析結果と返信内容を明確に区別
-- **日程調整機能**: 日程調整に関するメールの場合、GoogleカレンダーAPIと連携し、実際のスケジュール確認を行った上で適切な返信文（候補日時を含む）を自動生成
+- **AI返信生成**: AIがメール内容を分析し、最適な返信文を生成
+- **カレンダー連携**: 日程調整が必要な場合、Googleカレンダーと連携して空き時間を確認し、候補日時を提案
 - **直感的なUI**: ボタンベースのインターフェースで返信の選択、編集、送信が可能
-- **承認フロー**: 承認が必要なメールに対して承認/拒否の選択肢を提供し、結果に基づいた返信を生成
 - **添付ファイル処理**: メールの添付ファイルとURLを抽出し、Discordで確認可能
-- **出力保存機能**: AIの分析結果と生成された返信を保存し、後で参照可能
 
-## クイックスタート
+## 🚀 クイックスタート
 
-初めてシステムを使用する方のために、最低限必要な手順を紹介します。
+### 1. 必要なAPIキーの取得
 
-1. **必要なAPIキーの取得**:
-   - Discord Bot Token
-   - OpenAI APIキーまたはClaude APIキー
-   - Google Cloud Platformでプロジェクト作成（Gmail APIとGoogleカレンダーAPI用）
+このシステムを使用するには、以下のAPIキーと認証情報が必要です：
 
-2. **基本設定**:
-   ```bash
-   # リポジトリをクローン
-   git clone https://github.com/yourusername/gmail-discord-bot.git
-   cd gmail-discord-bot
-   
-   # 仮想環境を作成して有効化
-   python -m venv venv
-   source venv/bin/activate  # Linuxの場合
-   # または
-   venv\Scripts\activate     # Windowsの場合
-   
-   # 必要なパッケージをインストール
-   pip install -r requirements.txt
-   
-   # 設定ファイルを作成
-   cp gmail_discord_bot/config/.env.example gmail_discord_bot/config/.env
-   # .envファイルを編集して必要なAPIキーを設定
-   ```
+#### 1.1 Google Cloud Platform（Gmail APIとGoogleカレンダーAPI）
 
-3. **初回実行と認証**:
-   ```bash
-   python -m gmail_discord_bot.main
-   # ブラウザが開き、GoogleアカウントへのAPIアクセス許可を求められます
-   ```
+1. [Google Cloud Console](https://console.cloud.google.com/)にアクセスし、Googleアカウントでログイン
+2. 新しいプロジェクトを作成（右上のプロジェクト選択 → 「新しいプロジェクト」）
+3. プロジェクト名を入力し、「作成」をクリック
+4. 作成したプロジェクトを選択
+5. 左側のメニューから「APIとサービス」→「ライブラリ」を選択
+6. 検索バーで「Gmail API」を検索し、選択して「有効にする」をクリック
+7. 同様に「Google Calendar API」も検索して有効化
+8. 左側のメニューから「APIとサービス」→「認証情報」を選択
+9. 「認証情報を作成」→「OAuth クライアント ID」をクリック
+10. 「同意画面を構成」をクリック
+    - ユーザータイプ: 外部
+    - アプリ名、ユーザーサポートメール、デベロッパーの連絡先情報を入力
+    - 「保存して次へ」をクリック
+11. スコープの追加画面で以下を追加:
+    - `https://www.googleapis.com/auth/gmail.readonly`
+    - `https://www.googleapis.com/auth/gmail.send`
+    - `https://www.googleapis.com/auth/calendar.readonly`
+12. テストユーザーにご自身のGmailアドレスを追加
+13. 「認証情報」ページに戻り、「認証情報を作成」→「OAuth クライアント ID」を選択
+    - アプリケーションの種類: デスクトップアプリ
+    - 名前を入力し、「作成」をクリック
+14. ダウンロードボタンをクリックして認証情報（JSON）をダウンロード
+15. ダウンロードしたファイルの名前を「credentials.json」に変更し、`gmail_discord_bot/config/`ディレクトリに配置
+16. 同じファイルをコピーして「calendar_credentials.json」という名前で同じディレクトリに配置
 
-4. **使用開始**:
-   - Discordサーバーでボットが起動したことを確認
-   - 新しいメールが届くと自動的にDiscordに転送され、AI分析と返信候補が表示されます
-   - ボタンまたはコマンドを使用して返信を選択・編集・送信できます
-
-詳細な設定や高度な機能については、以下のセクションを参照してください。
-
-## システム要件
-
-このシステムを実行するために必要な環境要件です。
-
-- Python 3.8以上
-- pip（Pythonパッケージマネージャー）
-- インターネット接続
-- Gmail、Discord、OpenAI/Anthropic、Googleカレンダーの各アカウント
-
-## インストール手順
-
-システムのインストール方法を段階的に説明します。
-
-1. リポジトリをクローンまたはダウンロード
-
-```bash
-git clone https://github.com/yourusername/gmail-discord-bot.git
-cd gmail-discord-bot
-```
-
-2. 仮想環境の作成と有効化
-
-```bash
-# 仮想環境の作成
-python -m venv venv
-
-# 仮想環境の有効化
-# Linuxの場合:
-source venv/bin/activate
-# Windowsの場合:
-venv\Scripts\activate
-```
-
-3. 必要なパッケージのインストール
-
-```bash
-pip install -r requirements.txt
-```
-
-## API料金プラン
-
-このセクションでは、システムで使用する各APIの料金プランについて説明します。無料枠と有料プランの情報を把握し、コスト管理の参考にしてください。
-
-| API名 | 無料プラン | 無料枠の制限 | 有料プラン | 料金体系 | 備考 |
-|-------|------------|--------------|------------|----------|------|
-| **Gmail API** | あり | 1日あたり約1,000,000リクエスト | Google Workspaceの一部として提供 | Google Workspaceの料金プランに依存 | 個人利用の場合は通常無料枠で十分 |
-| **Discord API** | あり | ボット作成と基本機能は無料 | なし | なし | サーバーブーストなどの別機能に課金要素あり |
-| **OpenAI API (ChatGPT)** | なし | なし | 従量課金制 | モデルとトークン数に基づく従量課金<br>例：GPT-4は入力$0.01/1Kトークン、<br>出力$0.03/1Kトークン | 費用がかかる可能性のあるAPI |
-| **Anthropic API (Claude)** | なし | なし | 従量課金制 | モデルとトークン数に基づく従量課金<br>例：Claude 3.5 Sonnetは入力$3/1Mトークン、<br>出力$15/1Mトークン | 費用がかかる可能性のあるAPI |
-| **Google Calendar API** | あり | 1日あたり約1,000,000リクエスト | Google Workspaceの一部として提供 | Google Workspaceの料金プランに依存 | 個人利用の場合は通常無料枠で十分 |
-
-**注意事項**:
-- OpenAIとAnthropic APIは無料枠がないため、使用量に応じた費用が発生します
-- 料金プランは変更される可能性があるため、各サービスの公式サイトで最新情報を確認してください
-- 使用量が多い場合は、レート制限やコスト管理の仕組みを実装することをお勧めします
-
-## API設定ガイド
-
-このセクションでは、システムで使用する各APIの設定方法を説明します。各APIの設定は、システムを正常に動作させるために重要です。
-
-### Gmail API設定
-
-Gmail APIを設定して、メールの読み取りと送信を可能にします。
-
-1. [Google Cloud Console](https://console.cloud.google.com/)にアクセスし、新しいプロジェクトを作成
-2. 左側のメニューから「APIとサービス」→「ライブラリ」を選択
-3. 検索バーで「Gmail API」を検索し、選択して「有効にする」をクリック
-4. 「認証情報を作成」をクリックし、「OAuth クライアント ID」を選択
-5. 「同意画面を構成」をクリックし、必要な情報を入力
-   - ユーザータイプ: 外部
-   - アプリ名、ユーザーサポートメール、デベロッパーの連絡先情報を入力
-   - スコープの追加画面で「.../auth/gmail.readonly」と「.../auth/gmail.send」を追加
-   - テストユーザーにご自身のGmailアドレスを追加
-   - スコープの追加方法：左上の３本線から APIとサービスから認証情報を開く｡設定したいOAuth 2.0 クライアント IDの部分から、データアクセスへ移動しスコープの追加を行う。
-6. 「認証情報」ページに戻り、「認証情報を作成」→「OAuth クライアント ID」を選択
-   - アプリケーションの種類: デスクトップアプリ
-   - 名前を入力し、「作成」をクリック
-7. ダウンロードボタンをクリックして認証情報（credentials.json）をダウンロード
-8. ダウンロードしたファイルを`gmail_discord_bot/config/`ディレクトリに配置
-
-9. **参考動画**: Gmail APIの設定方法については、以下の動画も参考にしてください：
-   - [Gmail API設定解説動画](https://m.youtube.com/watch?v=TXvFaTn5lck&pp=ygUJZ21haWwgYXBp)
-
-#### Gmail API認証の詳細手順
-
-このプロジェクトでは、Gmail APIを使用するための認証を簡単に行うためのスクリプトを用意しています。以下の手順に従って設定を完了させてください。
-
-1. **認証情報ファイルの配置**
-   - ダウンロードしたJSONファイルの名前を「credentials.json」に変更します
-   - このファイルを `gmail_discord_bot/config/` ディレクトリに配置します
-
-2. **アクセストークンの取得**
-   - 以下のコマンドを実行して、Gmail APIのアクセストークンを取得します：
-   ```bash
-   python gmail_discord_bot/get_gmail_token.py
-   ```
-   - ブラウザが開き、Googleアカウントへのログインと権限の承認を求められます
-   - 承認すると、`token.json` ファイルが `gmail_discord_bot/config/` ディレクトリに生成されます
-
-3. **Gmail APIのテスト**
-   - 以下のコマンドを実行して、APIが正しく設定されているか確認します：
-   ```bash
-   python gmail_discord_bot/test_gmail_api.py
-   ```
-   - このスクリプトは、Gmailのラベル一覧と最近のメール（最大5件）を表示します
-   - 正常に動作すれば、Gmail APIの設定は完了です
-
-4. **注意事項**
-   - OAuth同意画面で「外部」を選択した場合、アプリは「テスト」モードになります
-   - テストモードでは、明示的に追加したテストユーザーのみがアプリを使用できます
-   - 個人的な使用やテスト目的であれば、「テスト」モードでも問題ありません
-   - 実際の運用環境では、アプリを「本番」モードに移行する必要がありますが、そのためにはGoogleの審査が必要です
-
-### Discord API設定
-
-Discordボットを作成し、メッセージの送受信を可能にします。
+#### 1.2 Discord Bot Token
 
 1. [Discord Developer Portal](https://discord.com/developers/applications)にアクセス
 2. 「New Application」をクリックし、アプリケーション名を入力して作成
@@ -229,66 +76,66 @@ Discordボットを作成し、メッセージの送受信を可能にします�
 10. サーバーのIDをコピー（後で`.env`ファイルに設定）
     - サーバーIDを取得するには、Discordの設定で開発者モードを有効にし、サーバー名を右クリックして「IDをコピー」を選択
 
-### OpenAI API設定
-
-ChatGPTを使用するためのAPIキーを取得します。
+#### 1.3 OpenAI API（ChatGPT）
 
 1. [OpenAIのウェブサイト](https://platform.openai.com/)にアクセスし、アカウントを作成またはログイン
 2. 右上のプロファイルアイコンをクリックし、「View API keys」を選択
 3. 「Create new secret key」をクリックし、新しいAPIキーを生成
 4. 生成されたAPIキーをコピー（このキーは後で`.env`ファイルに設定）
 
-### Claude API設定
-
-Claude AIを使用するためのAPIキーを取得します。
+#### 1.4 Claude API
 
 1. [Anthropicのウェブサイト](https://console.anthropic.com/)にアクセスし、アカウントを作成またはログイン
 2. 「API Keys」セクションに移動
 3. 「Create API Key」をクリックし、新しいAPIキーを生成
 4. 生成されたAPIキーをコピー（このキーは後で`.env`ファイルに設定）
 
-### Googleカレンダー API設定
+### 2. リポジトリのクローンとセットアップ
 
-Googleカレンダーと連携して、スケジュール情報を取得します。
+```bash
+# リポジトリをクローン
+git clone https://github.com/yourusername/gmail-discord-bot.git
+cd gmail-discord-bot
 
-1. [Google Cloud Console](https://console.cloud.google.com/)で、Gmail APIを設定したのと同じプロジェクトを使用
-2. 左側のメニューから「APIとサービス」→「ライブラリ」を選択
-3. 検索バーで「Google Calendar API」を検索し、選択して「有効にする」をクリック
-4. 「認証情報を作成」をクリックし、「OAuth クライアント ID」を選択
-5. アプリケーションの種類: デスクトップアプリ
-6. 名前を入力し、「作成」をクリック
-7. スコープの追加方法：左上の３本線から APIとサービスから認証情報を開く｡設定したいOAuth 2.0 クライアント IDの部分から、データアクセスへ移動しスコープの追加を行う。
-8. ダウンロードボタンをクリックして認証情報（calendar_credentials.json）をダウンロード
-9. ダウンロードしたファイルを`gmail_discord_bot/config/`ディレクトリに配置
+# 仮想環境を作成して有効化
+python -m venv venv
+source venv/bin/activate  # Linuxの場合
+# または
+venv\Scripts\activate     # Windowsの場合
 
-## 設定ファイルの作成
+# 必要なパッケージをインストール
+pip install -r requirements.txt
+```
 
-このセクションでは、システムの動作に必要な設定ファイルの作成方法を説明します。
+### 3. 設定ファイルの作成
 
-### システムプロンプトファイル
+#### 自動セットアップスクリプト（推奨）
 
-システムプロンプトは2つの別々のファイルに分かれています：
+設定ファイルを簡単に作成するために、自動セットアップスクリプトを用意しています。このスクリプトは対話形式で必要な情報を入力するだけで、すべての設定ファイルを自動的に生成します。
 
-1. **email_analyzer_prompt.txt** - メール分析用のシステムプロンプト
-   - メールの内容を分析し、必要な情報のタイプを特定するためのプロンプト
-   - 分析結果は `<分析>...</分析>` 形式で出力
-   - 必要情報は `<必要情報><タイプ>...</タイプ></必要情報>` 形式で出力
+```bash
+# 自動セットアップスクリプトを実行
+python setup_config.py
+```
 
-2. **email_responder_prompt.txt** - 返信生成用のシステムプロンプト
-   - 分析結果と追加情報を基に適切な返信を生成するためのプロンプト
-   - 返信内容は `<返信>...</返信>` 形式で出力
+スクリプトは以下の設定ファイルを生成します：
+- `.env` - 環境変数設定
+- `email_channel_mapping.json` - メールとDiscordチャンネルのマッピング
+- `email_settings.json` - メール署名とカレンダー設定
 
-これらのファイルは `gmail_discord_bot/config/` ディレクトリに配置されています。必要に応じて内容をカスタマイズすることができます。
+#### 手動セットアップ（詳細設定）
 
-### 環境変数の設定
+自動セットアップを使用しない場合は、以下の手順で手動で設定ファイルを作成できます。
 
-1. `.env.example`ファイルをコピーして`.env`ファイルを作成
+##### 3.1 環境変数の設定
+
+`.env.example`ファイルをコピーして`.env`ファイルを作成し、必要な情報を設定します：
 
 ```bash
 cp gmail_discord_bot/config/.env.example gmail_discord_bot/config/.env
 ```
 
-2. `.env`ファイルを編集し、必要な情報を設定
+`.env`ファイルを編集し、以下の情報を設定します：
 
 ```
 # Gmail API
@@ -305,6 +152,12 @@ OPENAI_API_KEY=your_openai_api_key
 CLAUDE_API_KEY=your_claude_api_key
 DEFAULT_AI_PROVIDER=chatgpt  # 'chatgpt' または 'claude'
 
+# OpenAIのモデル選択
+OPENAI_MODEL=gpt-4o
+
+# Claudeのモデル選択
+CLAUDE_MODEL=claude-3-7-sonnet-20250219
+
 # Google Calendar API
 CALENDAR_CREDENTIALS_FILE=calendar_credentials.json
 CALENDAR_TOKEN_FILE=calendar_token.json
@@ -318,287 +171,152 @@ EMAIL_CHANNEL_MAPPING_FILE=email_channel_mapping.json
 - `your_discord_guild_id`: ボットを追加したDiscordサーバーのID
 - `your_openai_api_key`: OpenAIで生成したAPIキー
 - `your_claude_api_key`: Anthropicで生成したAPIキー
-- `DEFAULT_AI_PROVIDER`: 使用するAIプロバイダー（`chatgpt`または`claude`）
 
-### メールとチャンネルのマッピング
+##### 3.2 メールとチャンネルのマッピング設定
 
-1. `email_channel_mapping.json`ファイルを`gmail_discord_bot/config/`ディレクトリに作成
+`email_channel_mapping.json.example`ファイルをコピーして`email_channel_mapping.json`ファイルを作成します：
+
+```bash
+cp gmail_discord_bot/config/email_channel_mapping.json.example gmail_discord_bot/config/email_channel_mapping.json
+```
+
+`email_channel_mapping.json`ファイルを編集し、メールアドレスとDiscordチャンネルIDのマッピングを設定します：
 
 ```json
 {
-  "example@company.com": "123456789012345678",
-  "another@example.com": "876543210987654321",
-  "domain.com": "567890123456789012",
-  "*@wildcard.com": "345678901234567890"
+  "specific.user@example.com": {
+    "email": "specific.user@example.com",
+    "name": "山田太郎",
+    "company": "Example株式会社",
+    "discord_channel_id": "1234567890123456789"
+  },
+  "*@example.com": {
+    "email": "*@example.com",
+    "name": "",
+    "company": "Example株式会社",
+    "discord_channel_id": "1122334455667788990"
+  }
 }
 ```
 
-- キー: メールアドレス、ドメイン、またはワイルドカードパターン
-- 値: 対応するDiscordチャンネルのID（チャンネルIDを取得するには、Discordの設定で開発者モードを有効にし、チャンネル名を右クリックして「IDをコピー」を選択）
+- `email`: メールアドレスまたはワイルドカードパターン
+- `name`: 送信者の名前（空でも可）
+- `company`: 送信者の会社名（空でも可）
+- `discord_channel_id`: 対応するDiscordチャンネルのID
+  - チャンネルIDを取得するには、Discordの設定で開発者モードを有効にし、チャンネル名を右クリックして「IDをコピー」を選択
 
-## 実行方法
+##### 3.3 メール設定の確認
 
-システムの実行方法を説明します。
+`email_settings.json`ファイルを確認し、必要に応じて編集します：
 
-1. 初回実行時は、Gmail APIとGoogleカレンダーAPIの認証が必要
+```json
+{
+  "calendar": {
+    "days": 30,
+    "working_hours": {
+      "start": 18,
+      "end": 23
+    },
+    "duration_minutes": 60,
+    "skip_weekends": true
+  },
+  "signature": {
+    "company_name": "あなたの会社名",
+    "name": "あなたの名前",
+    "email": "your.email@example.com",
+    "url": "https://example.com"
+  }
+}
+```
+
+- `calendar`: カレンダー関連の設定
+  - `days`: 何日先までの予定を確認するか
+  - `working_hours`: 勤務時間（24時間形式）
+  - `duration_minutes`: 会議の標準時間（分）
+  - `skip_weekends`: 週末をスキップするかどうか
+- `signature`: メール署名の設定
+  - `company_name`: 会社名
+  - `name`: 名前
+  - `email`: メールアドレス
+  - `url`: ウェブサイトURL
+
+### 4. 初回実行と認証
 
 ```bash
 python -m gmail_discord_bot.main
 ```
 
-2. ブラウザが自動的に開き、Googleアカウントへのアクセス許可を求められます
-3. アクセスを許可すると、トークンが保存され、以降の実行では認証は不要になります
-4. プログラムが正常に起動すると、ログにDiscordボットのログイン情報が表示されます
+初回実行時は、ブラウザが自動的に開き、以下の認証が求められます：
 
-## 使用方法
+1. **Gmail API認証**:
+   - Googleアカウントにログイン
+   - アプリへのアクセス許可を承認
+   - 認証が完了すると`token.json`ファイルが生成されます
 
-このセクションでは、システムの基本的な使用方法を説明します。
+2. **Googleカレンダー API認証**:
+   - 同様にGoogleアカウントへのアクセス許可を承認
+   - 認証が完了すると`calendar_token.json`ファイルが生成されます
 
-### Discordコマンド一覧
+認証が完了すると、Discordボットが起動し、新しいメールの監視が始まります。
 
-Discordサーバー内で使用できるコマンドの一覧です：
+## 💬 使用方法
+
+### Discordコマンド
 
 - `!help` - ヘルプメッセージを表示
 - `!status` - ボットのステータスを表示
-- `!select [番号]` - 提案された返信から選択（番号は1から始まる）
+- `!select [番号]` - 提案された返信から選択
 - `!edit [番号] [新しい内容]` - 提案された返信を編集
-- `!send [番号]` - 選択した返信を実際にメールとして送信
-- `!send` - 返信を実際にメールとして送信
-- `!approve [メールID]` - 承認リクエストを承認
-- `!reject [メールID]` - 承認リクエストを拒否
-- `!handle [メールID] [番号または対処法]` - その他情報リクエストに対処
+- `!send [番号]` - 選択した返信をメールとして送信
 
-### Discordボタン操作
+### ボタン操作
 
-システムは直感的なボタンインターフェースを提供しています：
+- **返信選択ボタン**: 各返信候補に「この返信を選択」と「編集する」ボタンが表示
+- **編集モーダル**: 「編集する」ボタンをクリックすると、テキスト編集用のモーダルウィンドウが表示
+- **送信確認ボタン**: 「メールを送信する」ボタンをクリックすると、最終確認画面が表示
 
-- **返信選択ボタン**: 各返信候補に「この返信を選択」と「編集する」ボタンが表示されます
-- **編集モーダル**: 「編集する」ボタンをクリックすると、テキスト編集用のモーダルウィンドウが表示されます
-- **送信確認ボタン**: 「メールを送信する」ボタンをクリックすると、最終確認画面が表示されます
-- **承認ボタン**: 承認が必要なメールには「承認する」と「拒否する」ボタンが表示されます
+## 🔧 初期設定のトラブルシューティング
 
-これらのボタンを使用することで、テキストコマンドを入力することなく操作が可能です。
+### Gmail API認証エラー
 
-### メール処理フロー
-
-システムがメールを処理する基本的な流れを説明します：
-
-1. 新しいメールが受信されると、設定されたマッピングに基づいて対応するDiscordチャンネルに転送されます
-2. AIがメールを分析し、必要な情報のタイプを特定します（カレンダー情報、承認情報など）
-3. 必要な情報のタイプに応じて追加情報を取得します（例：カレンダー情報が必要な場合はGoogleカレンダーから利用可能なスロットを取得）
-4. 分析結果と追加情報を基に、AIが適切な返信を生成します
-5. 生成された返信がDiscordチャンネルに投稿されます
-6. 必要に応じてボタンまたは`!select`コマンドで返信を選択し、`!edit`コマンドまたは編集ボタンで返信内容を編集できます
-7. `!send`コマンドまたは送信ボタンで返信をメールとして送信できます
-
-### 処理フロー図
-
-以下は、システムの処理フローを図式化したものです。実際の運用では、この流れに沿ってメールが処理されます。
-
-```mermaid
-flowchart TD
-    A[Gmailでメール受信] --> B{送信元アドレスの確認}
-    B -->|マッピングあり| C[送信者情報から宛名抽出]
-    B -->|マッピングなし| Z[処理終了]
-    C --> D[Discordチャンネルへ転送]
-    D --> E[システムプロンプトとメール情報を準備]
-    E --> F[AIでメール分析]
-    F --> G{必要情報の確認}
-    G -->|カレンダー情報が必要| H[Googleカレンダーから\nスケジュール取得]
-    G -->|承認が必要| H2[承認ボタンを表示]
-    G -->|添付ファイル確認が必要| H3[添付ファイルとURLを表示]
-    G -->|その他の情報が必要| I[必要な追加情報を取得]
-    G -->|追加情報不要| J[基本情報のみ使用]
-    H --> K[AI APIで返信生成]
-    H2 -->|承認または拒否| K
-    H3 --> K
-    I --> K
-    J --> K
-    K --> L[Discordに返信候補を表示]
-    L --> M{編集が必要?}
-    M -->|はい| N[ボタンまたはコマンドで\n返信を選択・編集]
-    M -->|いいえ| O[ボタンまたはコマンドで\n返信を送信]
-    N --> O
-    O --> P[Gmailで返信メール送信]
-    P --> Q[処理完了]
-```
-
-注意: 上記のフローチャートはテキストベースの表現です。実際の視覚的なフローチャートが必要な場合は、Mermaid記法をサポートするMarkdownビューアで表示するか、画像として保存してください。
-
-## プロジェクト構造
-
-このセクションでは、プロジェクトのディレクトリ構造と各ファイルの役割を説明します。
-
-```
-gmail_discord_bot/
-├── __init__.py
-├── main.py                      # アプリケーションのエントリーポイント
-├── get_gmail_token.py           # Gmail APIトークン取得スクリプト
-├── test_gmail_api.py            # Gmail API動作確認スクリプト
-├── gmail_module/                # Gmailとの連携を担当
-│   ├── __init__.py
-│   ├── gmail_client.py          # Gmail APIクライアント
-│   └── email_processor.py       # メール処理ロジック
-├── discord_module/              # Discordとの連携を担当
-│   ├── __init__.py
-│   ├── discord_bot.py           # Discordボットの実装
-│   └── message_formatter.py     # メッセージフォーマット処理
-├── name_module/                 # 宛名管理を担当
-│   ├── __init__.py
-│   ├── name_extractor.py        # メールから宛名情報を抽出
-│   └── name_manager.py          # 宛名情報の管理
-├── chatgpt_module/              # ChatGPT連携を担当
-│   ├── __init__.py
-│   └── response_processor.py    # 応答処理
-├── claude_module/               # Claude連携を担当
-│   ├── __init__.py
-│   └── response_processor.py    # 応答処理
-├── ai_module/                   # AI共通モジュール
-│   ├── __init__.py
-│   └── ai_factory.py            # AIプロバイダーファクトリー
-├── calendar_module/             # Googleカレンダー連携を担当
-│   ├── __init__.py
-│   ├── calendar_client.py       # カレンダーAPIクライアント
-│   └── schedule_analyzer.py     # スケジュール分析
-├── utils/                       # ユーティリティ関数
-│   ├── __init__.py
-│   ├── logger.py                # ロギング
-│   └── output_saver.py          # AI出力保存
-├── config/                      # 設定関連
-│   ├── config.py                # 設定管理
-│   ├── .env.example             # 環境変数サンプル
-│   ├── .env                     # 環境変数（作成必要）
-│   ├── email_analyzer_prompt.txt # メール分析用システムプロンプト
-│   ├── email_responder_prompt.txt # 返信生成用システムプロンプト
-│   ├── email_settings.json      # メール設定
-│   └── data/                    # JSONデータファイル保存ディレクトリ
-│       └── name_database.json   # 名前データベース
-├── logs/                        # ログファイル保存ディレクトリ
-```
-
-**主要モジュールの役割**:
-
-- **main.py**: システム全体の起動と制御を担当
-- **gmail_module**: Gmailからのメール取得と送信を担当
-- **discord_module**: Discordボットの操作とメッセージ処理を担当
-- **ai_module**: AIプロバイダー（ChatGPTとClaude）の切り替えを担当
-- **calendar_module**: Googleカレンダーとの連携を担当
-- **name_module**: 送信者情報からの宛名抽出と管理を担当
-- **config**: 設定ファイルとプロンプトの管理を担当
-- **utils**: ロギングやAI出力の保存などのユーティリティ機能を担当
-
-**注意**: プロンプト生成機能は直接 `config.py` から取得するように最適化されたため、`prompt_generator.py` ファイルは不要になりました。
-
-## トラブルシューティング
-
-このセクションでは、よく発生する問題とその解決方法を説明します。
-
-### API認証エラー
-
-**問題**: API認証に関するエラーが発生する
-
-**エラーメッセージ例**:
-```
-Error: invalid_grant: Token has been expired or revoked.
-```
+**問題**: Gmail APIの認証に失敗する
 
 **解決策**:
-1. 認証情報ファイル（credentials.json, calendar_credentials.json）が正しい場所にあるか確認
-2. トークンファイル（token.json, calendar_token.json）を削除して再認証を試みる
-3. APIキーやトークンが正しく`.env`ファイルに設定されているか確認
-4. Google Cloud ConsoleでAPIが有効になっているか確認
+1. `credentials.json`ファイルが正しく配置されているか確認
+2. Google Cloud Consoleで正しいスコープが設定されているか確認
+3. `token.json`ファイルを削除して再認証を試みる
+4. OAuth同意画面でテストユーザーとして自分のメールアドレスが追加されているか確認
 
-### メールが転送されない
+### Discord接続エラー
 
-**問題**: 新しいメールが受信されてもDiscordに転送されない
-
-**エラーメッセージ例**:
-```
-No matching channel found for email from: example@domain.com
-```
+**問題**: Discordボットが接続できない
 
 **解決策**:
-1. `email_channel_mapping.json`ファイルのマッピングが正しいか確認
-2. ログファイルでエラーメッセージを確認
-3. Gmail APIのスコープが正しく設定されているか確認
-4. Discordボットがサーバーに正しく招待され、チャンネルにアクセスできるか確認
+1. `.env`ファイルのDISCORD_BOT_TOKENが正しいか確認
+2. ボットに必要な権限が付与されているか確認
+3. DISCORD_GUILD_IDが正しいか確認
+4. MESSAGE CONTENT INTENTが有効になっているか確認
 
-### 返信が生成されない
+### AI API接続エラー
 
-**問題**: メールは転送されるが、返信が生成されない
-
-**エラーメッセージ例**:
-```
-Error: API request failed: 401 - Unauthorized
-```
+**問題**: AI APIに接続できない
 
 **解決策**:
-1. OpenAIまたはClaude APIキーが正しく設定されているか確認
-2. APIの使用制限に達していないか確認
-3. ログファイルでエラーメッセージを確認
-4. インターネット接続を確認
-5. `.env`ファイルの`DEFAULT_AI_PROVIDER`が正しく設定されているか確認
+1. `.env`ファイルのOPENAI_API_KEYまたはCLAUDE_API_KEYが正しいか確認
+2. DEFAULT_AI_PROVIDERが正しく設定されているか確認（`chatgpt`または`claude`）
+3. インターネット接続を確認
+4. APIキーの利用制限に達していないか確認
 
-### Discordボットが応答しない
+### メールチャンネルマッピングエラー
 
-**問題**: Discordボットがコマンドに応答しない
+**問題**: メールがDiscordに転送されない
 
 **解決策**:
-1. ボットが正しく起動しているか確認（ログで「〇〇としてログインしました」メッセージを確認）
-2. ボットトークンが正しく設定されているか確認
-3. ボットに必要な権限が付与されているか確認
-4. Discordの接続状態を確認
+1. `email_channel_mapping.json`ファイルが正しく設定されているか確認
+2. Discordチャンネルが存在し、ボットがアクセスできるか確認
+3. メールアドレスのパターンが正しいか確認
 
-## よくある質問（FAQ）
-
-このセクションでは、システムに関するよくある質問と回答を提供します。
-
-### 返信の確認と送信について
-**Q: 返信はどのように確認・送信されますか？**
-
-A: Discord上に生成された返信が表示され、ユーザーが内容を確認します。「この返信を選択」ボタンをクリックして選択し、必要に応じて「編集する」ボタンで編集した上で、「メールを送信する」ボタンで実際の返信メールとして送信します。テキストコマンドを使用する場合は、`!edit [番号] [新しい内容]`コマンドで編集した上で、`!send [番号]`コマンドで送信できます。
-
-### メール内容の解析について
-**Q: メール内容の解析はどのように行われますか？**
-
-A: 2段階処理の最初のステップとして、AIがメール内容を分析します。この分析では、メールの主題、送信者の意図、必要なアクション、重要な詳細を特定し、どのような追加情報が必要かを判断します。例えば、日程調整に関するメールであれば「カレンダー」タイプの情報が必要と判断され、GoogleカレンダーAPIから利用可能なスロット情報が取得されます。分析結果はXML形式で構造化され、次の返信生成ステップで活用されます。
-
-### システムダウンタイムについて
-**Q: システムのダウンタイムが発生した場合はどうなりますか？**
-
-A: 未処理のメールがある場合は、システム復旧後に処理キューから順次処理します。重要なメールが見逃されないよう、エラーログと未処理メール一覧を管理者に通知する仕組みがあります。
-
-### API使用制限について
-**Q: APIの使用制限にはどう対応しますか？**
-
-A: 各APIの使用制限を監視し、制限に近づいた場合はレート制限を設けています。特にAI APIやGmail APIの利用量が多い場合は、処理の優先順位付けや一時的な機能制限などの対策が必要です。
-
-### 宛名情報の学習について
-**Q: 宛名情報の学習はどのように行われますか？**
-
-A: 一度やり取りしたメールアドレスと対応する会社名・担当者名をJSONファイルに保存します。メール署名の解析や返信時に手動で修正された宛名情報も学習し、次回からの精度向上に活用します。
-
-### 宛名情報の更新について
-**Q: 宛名情報の更新はどうしますか？**
-
-A: 同じメールアドレスでも担当者が変わる場合があるため、最新のメールに含まれる署名情報を優先的に使用します。また、コマンドからいつでも手動で情報を更新できる仕組みも用意しています。
-
-### AIプロバイダーの選択について
-**Q: ChatGPTとClaudeのどちらを使うべきですか？**
-
-A: 用途や予算に応じて選択できます。ChatGPTは一般的なタスクに優れており、Claudeは長文の理解や丁寧な応答が特徴です。`.env`ファイルの`DEFAULT_AI_PROVIDER`設定で切り替えられます。
-
-### 承認フローについて
-**Q: 承認が必要なメールはどのように処理されますか？**
-
-A: AIがメールを分析し、承認が必要と判断した場合、Discordチャンネルに承認リクエストが送信されます。「承認する」または「拒否する」ボタンをクリックすると、その結果に基づいた返信が生成されます。
-
-### 添付ファイルの処理について
-**Q: 添付ファイルはどのように処理されますか？**
-
-A: メールに添付ファイルがある場合、システムはそれらを抽出してDiscordチャンネルに送信します。URLも同様に抽出され、確認できるようになっています。
-
-## ライセンス
+## 📄 ライセンス
 
 Apache License 2.0
 
@@ -621,4 +339,3 @@ limitations under the License.
 ```
 
 **最終更新日**: 2025年4月6日
-**バージョン**: 1.0.0
