@@ -32,50 +32,163 @@ class ApprovalView(ui.View):
         self.stop()
 
 class SendConfirmView(ui.View):
-    def __init__(self, channel_id, option_number, response_text, bot, timeout=None):
+    def __init__(self, channel_id, option_number, response_text, bot, timeout=None, discord_bot=None):
         super().__init__(timeout=timeout)
         self.channel_id = channel_id
         self.option_number = option_number
         self.response_text = response_text
         self.bot = bot
+        self.discord_bot = discord_bot  # DiscordBotインスタンスを保持
     
-    @ui.button(label="メールを送信する", style=ButtonStyle.primary, custom_id="confirm_send")
+    @ui.button(label="編集する", style=ButtonStyle.primary, custom_id="re_edit", row=0)
+    async def re_edit_button(self, interaction: discord.Interaction, button: ui.Button):
+        # 編集モーダルを表示
+        try:
+            if self.discord_bot:
+                modal = EditResponseModal(self.discord_bot, self.channel_id, self.option_number, self.response_text)
+                await interaction.response.send_modal(modal)
+                logger.info(f"編集モーダルを表示しました: チャンネルID {self.channel_id}, オプション {self.option_number}")
+            else:
+                # discord_botが設定されていない場合（古いコードとの互換性のため）
+                await interaction.response.send_message("編集機能を使用するには、もう一度返信候補から「編集する」ボタンを押してください。")
+                logger.warning(f"discord_botが設定されていないため編集モーダルを表示できません: チャンネルID {self.channel_id}")
+            self.stop()
+        except Exception as e:
+            logger.error(f"編集ボタン処理エラー: {e}")
+            import traceback
+            logger.error(f"詳細なエラー情報: {traceback.format_exc()}")
+            await interaction.response.send_message(f"エラーが発生しました: {str(e)}", ephemeral=True)
+    
+    @ui.button(label="メールを送信する", style=ButtonStyle.success, custom_id="confirm_send", row=0)
     async def confirm_send_button(self, interaction: discord.Interaction, button: ui.Button):
         # 最初の確認ボタンを押した後、最終確認ボタンを表示
-        for item in self.children:
-            item.disabled = True
-        
-        await interaction.response.edit_message(view=self)
-        
-        # 最終確認ボタンを含む新しいビューを作成
-        final_view = FinalSendConfirmView(self.channel_id, self.option_number, self.response_text, self.bot)
-        await interaction.followup.send("**本当にこのメールを送信しますか？**", view=final_view)
-        self.stop()
+        try:
+            for item in self.children:
+                item.disabled = True
+            
+            await interaction.response.edit_message(view=self)
+            
+            # 最終確認ボタンを含む新しいビューを作成
+            final_view = FinalSendConfirmView(self.channel_id, self.option_number, self.response_text, self.bot, discord_bot=self.discord_bot)
+            await interaction.followup.send("**本当にこのメールを送信しますか？**", view=final_view)
+            logger.info(f"最終確認ビューを表示しました: チャンネルID {self.channel_id}, オプション {self.option_number}")
+            self.stop()
+        except Exception as e:
+            logger.error(f"送信確認ボタン処理エラー: {e}")
+            import traceback
+            logger.error(f"詳細なエラー情報: {traceback.format_exc()}")
+            await interaction.response.send_message(f"エラーが発生しました: {str(e)}", ephemeral=True)
     
-    @ui.button(label="キャンセル", style=ButtonStyle.secondary, custom_id="cancel_send")
+    @ui.button(label="キャンセル", style=ButtonStyle.secondary, custom_id="cancel_send", row=0)
     async def cancel_button(self, interaction: discord.Interaction, button: ui.Button):
         await interaction.response.send_message("メール送信をキャンセルしました。")
+        logger.info(f"メール送信がキャンセルされました: チャンネルID {self.channel_id}")
         self.stop()
 
 class FinalSendConfirmView(ui.View):
-    def __init__(self, channel_id, option_number, response_text, bot, timeout=None):
+    def __init__(self, channel_id, option_number, response_text, bot, timeout=None, discord_bot=None):
         super().__init__(timeout=timeout)
         self.channel_id = channel_id
         self.option_number = option_number
         self.response_text = response_text
         self.bot = bot
+        self.discord_bot = discord_bot  # DiscordBotインスタンスを保持
     
-    @ui.button(label="はい、送信します", style=ButtonStyle.success, custom_id="final_confirm")
+    @ui.button(label="編集する", style=ButtonStyle.primary, custom_id="final_edit", row=0)
+    async def final_edit_button(self, interaction: discord.Interaction, button: ui.Button):
+        # 編集モーダルを表示
+        try:
+            if self.discord_bot:
+                modal = EditResponseModal(self.discord_bot, self.channel_id, self.option_number, self.response_text)
+                await interaction.response.send_modal(modal)
+                logger.info(f"最終確認画面から編集モーダルを表示しました: チャンネルID {self.channel_id}, オプション {self.option_number}")
+            else:
+                # discord_botが設定されていない場合（古いコードとの互換性のため）
+                await interaction.response.send_message("編集機能を使用するには、もう一度返信候補から「編集する」ボタンを押してください。")
+                logger.warning(f"discord_botが設定されていないため最終確認画面から編集モーダルを表示できません: チャンネルID {self.channel_id}")
+            self.stop()
+        except Exception as e:
+            logger.error(f"最終確認画面の編集ボタン処理エラー: {e}")
+            import traceback
+            logger.error(f"詳細なエラー情報: {traceback.format_exc()}")
+            await interaction.response.send_message(f"エラーが発生しました: {str(e)}", ephemeral=True)
+    
+    @ui.button(label="はい、送信します", style=ButtonStyle.success, custom_id="final_confirm", row=0)
     async def final_confirm_button(self, interaction: discord.Interaction, button: ui.Button):
-        await interaction.response.send_message("メールを送信しています...")
-        # 送信イベントを発火
-        self.bot.dispatch('send_email', self.channel_id, self.option_number)
-        self.stop()
+        try:
+            await interaction.response.send_message("メールを送信しています...")
+            # 送信イベントを発火
+            self.bot.dispatch('send_email', self.channel_id, self.option_number)
+            logger.info(f"メール送信イベントを発火しました: チャンネルID {self.channel_id}, オプション {self.option_number}")
+            self.stop()
+        except Exception as e:
+            logger.error(f"メール送信ボタン処理エラー: {e}")
+            import traceback
+            logger.error(f"詳細なエラー情報: {traceback.format_exc()}")
+            await interaction.response.send_message(f"エラーが発生しました: {str(e)}", ephemeral=True)
     
-    @ui.button(label="いいえ、キャンセルします", style=ButtonStyle.danger, custom_id="final_cancel")
+    @ui.button(label="いいえ、キャンセルします", style=ButtonStyle.danger, custom_id="final_cancel", row=0)
     async def final_cancel_button(self, interaction: discord.Interaction, button: ui.Button):
         await interaction.response.send_message("メール送信をキャンセルしました。")
+        logger.info(f"最終確認画面でメール送信がキャンセルされました: チャンネルID {self.channel_id}")
         self.stop()
+
+# 編集用モーダル
+class EditResponseModal(ui.Modal, title="返信を編集"):
+    def __init__(self, discord_bot, channel_id, option_number, response_text):
+        super().__init__()
+        self.discord_bot = discord_bot
+        self.channel_id = channel_id
+        self.option_number = option_number
+        
+        try:
+            # テキスト入力フィールドを追加
+            self.response_input = ui.TextInput(
+                label="編集内容",
+                style=discord.TextStyle.paragraph,
+                default=response_text,
+                required=True,
+                max_length=4000  # Discordの制限
+            )
+            self.add_item(self.response_input)
+            logger.info(f"編集モーダルを初期化しました: チャンネルID {channel_id}, オプション {option_number}")
+        except Exception as e:
+            logger.error(f"編集モーダル初期化エラー: {e}")
+            import traceback
+            logger.error(f"詳細なエラー情報: {traceback.format_exc()}")
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            # 編集した内容を保存
+            thread_id = str(self.channel_id)
+            edited_text = self.response_input.value
+            
+            logger.info(f"編集モーダルが送信されました: チャンネルID {thread_id}, オプション {self.option_number}")
+            
+            if thread_id in self.discord_bot.response_options:
+                # 編集した内容を保存
+                self.discord_bot.response_options[thread_id]['options'][self.option_number - 1] = edited_text
+                logger.info(f"編集内容を保存しました: チャンネルID {thread_id}, オプション {self.option_number}")
+                
+                # 編集後の内容を表示
+                embed = discord.Embed(
+                    title=f"編集後の返信 {self.option_number}",
+                    description=f"```\n{edited_text}\n```",
+                    color=discord.Color.green()
+                )
+                
+                # 送信確認ボタンを表示
+                view = SendConfirmView(thread_id, self.option_number, edited_text, self.discord_bot.bot, timeout=3600, discord_bot=self.discord_bot)
+                await interaction.response.send_message(embed=embed, view=view)
+                logger.info(f"編集後の内容と送信確認ボタンを表示しました: チャンネルID {thread_id}, オプション {self.option_number}")
+            else:
+                await interaction.response.send_message("返信候補の情報が見つかりません。")
+                logger.warning(f"返信候補の情報が見つかりません: チャンネルID {thread_id}")
+        except Exception as e:
+            logger.error(f"編集モーダル送信処理エラー: {e}")
+            import traceback
+            logger.error(f"詳細なエラー情報: {traceback.format_exc()}")
+            await interaction.response.send_message(f"エラーが発生しました: {str(e)}", ephemeral=True)
 
 class ResponseSelectView(ui.View):
     def __init__(self, discord_bot, channel_id, option_number, response_text, timeout=None):
@@ -85,19 +198,45 @@ class ResponseSelectView(ui.View):
         self.option_number = option_number
         self.response_text = response_text
     
-    @ui.button(label="この返信を選択", style=ButtonStyle.primary, custom_id="select_response")
+    @ui.button(label="この返信を選択", style=ButtonStyle.primary, custom_id="select_response", row=0)
     async def select_button(self, interaction: discord.Interaction, button: ui.Button):
         # 選択した返信を保存
-        thread_id = str(self.channel_id)
-        if thread_id in self.discord_bot.response_options:
-            self.discord_bot.response_options[thread_id]['selected'] = self.option_number - 1
+        try:
+            thread_id = str(self.channel_id)
+            logger.info(f"返信選択ボタンがクリックされました: チャンネルID {thread_id}, オプション {self.option_number}")
             
-            # 送信確認ボタンを表示
-            view = SendConfirmView(thread_id, self.option_number, self.response_text, self.discord_bot.bot, timeout=3600)
-            await interaction.response.send_message(f"返信 {self.option_number} を選択しました。送信しますか？", view=view)
-        else:
-            await interaction.response.send_message("返信候補の情報が見つかりません。")
-        self.stop()
+            if thread_id in self.discord_bot.response_options:
+                self.discord_bot.response_options[thread_id]['selected'] = self.option_number - 1
+                logger.info(f"返信 {self.option_number} が選択されました: チャンネルID {thread_id}")
+                
+                # 送信確認ボタンを表示
+                view = SendConfirmView(thread_id, self.option_number, self.response_text, self.discord_bot.bot, timeout=3600, discord_bot=self.discord_bot)
+                await interaction.response.send_message(f"返信 {self.option_number} を選択しました。送信しますか？", view=view)
+                logger.info(f"送信確認ビューを表示しました: チャンネルID {thread_id}, オプション {self.option_number}")
+            else:
+                await interaction.response.send_message("返信候補の情報が見つかりません。")
+                logger.warning(f"返信候補の情報が見つかりません: チャンネルID {thread_id}")
+            self.stop()
+        except Exception as e:
+            logger.error(f"返信選択ボタン処理エラー: {e}")
+            import traceback
+            logger.error(f"詳細なエラー情報: {traceback.format_exc()}")
+            await interaction.response.send_message(f"エラーが発生しました: {str(e)}", ephemeral=True)
+    
+    @ui.button(label="編集する", style=ButtonStyle.primary, custom_id="edit_response", row=0)
+    async def edit_button(self, interaction: discord.Interaction, button: ui.Button):
+        # 編集モーダルを表示
+        try:
+            logger.info(f"編集ボタンがクリックされました: チャンネルID {self.channel_id}, オプション {self.option_number}")
+            modal = EditResponseModal(self.discord_bot, self.channel_id, self.option_number, self.response_text)
+            await interaction.response.send_modal(modal)
+            logger.info(f"編集モーダルを表示しました: チャンネルID {self.channel_id}, オプション {self.option_number}")
+            self.stop()
+        except Exception as e:
+            logger.error(f"編集ボタン処理エラー: {e}")
+            import traceback
+            logger.error(f"詳細なエラー情報: {traceback.format_exc()}")
+            await interaction.response.send_message(f"エラーが発生しました: {str(e)}", ephemeral=True)
 
 class DiscordBot:
     def __init__(self):
@@ -249,26 +388,38 @@ class DiscordBot:
         @self.bot.command(name='send')
         async def send_email(ctx, option_number: int):
             """選択した返信をメールとして送信"""
-            thread_id = str(ctx.channel.id)
-            
-            if thread_id not in self.response_options:
-                await ctx.send("このチャンネルでは返信候補が生成されていません。")
-                return
-            
-            if self.response_options[thread_id]['selected'] is None:
-                await ctx.send("まず `!select [番号]` で返信を選択してください。")
-                return
-            
-            if option_number < 1 or option_number > len(self.response_options[thread_id]['options']):
-                await ctx.send(f"1から{len(self.response_options[thread_id]['options'])}の間の番号を選択してください。")
-                return
-            
-            # 選択した返信を取得
-            selected_text = self.response_options[thread_id]['options'][option_number - 1]
-            
-            # 送信確認ボタンを表示
-            view = SendConfirmView(thread_id, option_number, selected_text, self.bot, timeout=3600)  # 1時間のタイムアウト
-            await ctx.send("メール送信の確認:", view=view)
+            try:
+                thread_id = str(ctx.channel.id)
+                logger.info(f"!sendコマンドが実行されました: チャンネルID {thread_id}, オプション {option_number}")
+                
+                if thread_id not in self.response_options:
+                    await ctx.send("このチャンネルでは返信候補が生成されていません。")
+                    logger.warning(f"返信候補の情報が見つかりません: チャンネルID {thread_id}")
+                    return
+                
+                if self.response_options[thread_id]['selected'] is None:
+                    await ctx.send("まず `!select [番号]` で返信を選択してください。")
+                    logger.warning(f"返信が選択されていません: チャンネルID {thread_id}")
+                    return
+                
+                if option_number < 1 or option_number > len(self.response_options[thread_id]['options']):
+                    await ctx.send(f"1から{len(self.response_options[thread_id]['options'])}の間の番号を選択してください。")
+                    logger.warning(f"無効なオプション番号: {option_number}, チャンネルID {thread_id}")
+                    return
+                
+                # 選択した返信を取得
+                selected_text = self.response_options[thread_id]['options'][option_number - 1]
+                logger.info(f"送信用に返信 {option_number} を取得しました: チャンネルID {thread_id}")
+                
+                # 送信確認ボタンを表示
+                view = SendConfirmView(thread_id, option_number, selected_text, self.bot, timeout=3600, discord_bot=self)  # 1時間のタイムアウト
+                await ctx.send("メール送信の確認:", view=view)
+                logger.info(f"送信確認ビューを表示しました: チャンネルID {thread_id}, オプション {option_number}")
+            except Exception as e:
+                logger.error(f"!sendコマンド処理エラー: {e}")
+                import traceback
+                logger.error(f"詳細なエラー情報: {traceback.format_exc()}")
+                await ctx.send(f"エラーが発生しました: {str(e)}")
             
         @self.bot.command(name='approve')
         async def approve_request(ctx, email_id: str):
@@ -304,26 +455,82 @@ class DiscordBot:
             await ctx.send(f"メール {email_id} に対して「{action}」の対処を行います。")
             # ここで対処後の処理を実装
         
+        @self.bot.command(name='edit')
+        async def edit_response(ctx, option_number: int, *, new_content: str = None):
+            """提案された返信を編集"""
+            try:
+                thread_id = str(ctx.channel.id)
+                logger.info(f"!editコマンドが実行されました: チャンネルID {thread_id}, オプション {option_number}")
+                
+                if thread_id not in self.response_options:
+                    await ctx.send("このチャンネルでは返信候補が生成されていません。")
+                    logger.warning(f"返信候補の情報が見つかりません: チャンネルID {thread_id}")
+                    return
+                
+                if option_number < 1 or option_number > len(self.response_options[thread_id]['options']):
+                    await ctx.send(f"1から{len(self.response_options[thread_id]['options'])}の間の番号を選択してください。")
+                    logger.warning(f"無効なオプション番号: {option_number}, チャンネルID {thread_id}")
+                    return
+                
+                # 新しい内容が指定されていない場合は、現在の内容をコピー用に表示
+                if new_content is None:
+                    current_text = self.response_options[thread_id]['options'][option_number - 1]
+                    await ctx.send(f"以下の内容をコピーして編集し、`!edit {option_number} 編集した内容`として送信してください：\n```\n{current_text}\n```")
+                    logger.info(f"編集用にコピーテキストを表示しました: チャンネルID {thread_id}, オプション {option_number}")
+                    return
+                
+                # 編集した内容を保存
+                self.response_options[thread_id]['options'][option_number - 1] = new_content
+                logger.info(f"編集内容を保存しました: チャンネルID {thread_id}, オプション {option_number}")
+                
+                # 編集後の内容を表示
+                embed = discord.Embed(
+                    title=f"編集後の返信 {option_number}",
+                    description=f"```\n{new_content}\n```",
+                    color=discord.Color.green()
+                )
+                
+                # 送信確認ボタンを表示
+                view = SendConfirmView(thread_id, option_number, new_content, self.bot, timeout=3600, discord_bot=self)  # 1時間のタイムアウト
+                await ctx.send(embed=embed, view=view)
+                logger.info(f"編集後の内容と送信確認ボタンを表示しました: チャンネルID {thread_id}, オプション {option_number}")
+            except Exception as e:
+                logger.error(f"!editコマンド処理エラー: {e}")
+                import traceback
+                logger.error(f"詳細なエラー情報: {traceback.format_exc()}")
+                await ctx.send(f"エラーが発生しました: {str(e)}")
+        
         @self.bot.command(name='select')
         async def select_response(ctx, option_number: int):
             """提案された返信から選択"""
-            thread_id = str(ctx.channel.id)
-            
-            if thread_id not in self.response_options:
-                await ctx.send("このチャンネルでは返信候補が生成されていません。")
-                return
-            
-            if option_number < 1 or option_number > len(self.response_options[thread_id]['options']):
-                await ctx.send(f"1から{len(self.response_options[thread_id]['options'])}の間の番号を選択してください。")
-                return
-            
-            # 選択した返信を保存
-            self.response_options[thread_id]['selected'] = option_number - 1
-            selected_text = self.response_options[thread_id]['options'][option_number - 1]
-            
-            # 送信確認ボタンを表示
-            view = SendConfirmView(thread_id, option_number, selected_text, self.bot, timeout=3600)  # 1時間のタイムアウト
-            await ctx.send(f"```\n{selected_text}\n```", view=view)
+            try:
+                thread_id = str(ctx.channel.id)
+                logger.info(f"!selectコマンドが実行されました: チャンネルID {thread_id}, オプション {option_number}")
+                
+                if thread_id not in self.response_options:
+                    await ctx.send("このチャンネルでは返信候補が生成されていません。")
+                    logger.warning(f"返信候補の情報が見つかりません: チャンネルID {thread_id}")
+                    return
+                
+                if option_number < 1 or option_number > len(self.response_options[thread_id]['options']):
+                    await ctx.send(f"1から{len(self.response_options[thread_id]['options'])}の間の番号を選択してください。")
+                    logger.warning(f"無効なオプション番号: {option_number}, チャンネルID {thread_id}")
+                    return
+                
+                # 選択した返信を保存
+                self.response_options[thread_id]['selected'] = option_number - 1
+                selected_text = self.response_options[thread_id]['options'][option_number - 1]
+                logger.info(f"返信 {option_number} が選択されました: チャンネルID {thread_id}")
+                
+                # 送信確認ボタンを表示
+                view = SendConfirmView(thread_id, option_number, selected_text, self.bot, timeout=3600, discord_bot=self)  # 1時間のタイムアウト
+                await ctx.send(f"```\n{selected_text}\n```", view=view)
+                logger.info(f"送信確認ビューを表示しました: チャンネルID {thread_id}, オプション {option_number}")
+            except Exception as e:
+                logger.error(f"!selectコマンド処理エラー: {e}")
+                import traceback
+                logger.error(f"詳細なエラー情報: {traceback.format_exc()}")
+                await ctx.send(f"エラーが発生しました: {str(e)}")
     
     async def send_email_notification(self, channel_id, email_data):
         """メール通知をDiscordチャンネルに送信"""
