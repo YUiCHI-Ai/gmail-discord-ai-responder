@@ -4,6 +4,8 @@ import asyncio
 from async_timeout import timeout as async_timeout
 from ..config import config
 from ..utils.logger import setup_logger
+import json
+from pathlib import Path
 from discord import ui, ButtonStyle
 
 logger = setup_logger(__name__)
@@ -562,6 +564,17 @@ class DiscordBot:
             
             logger.info(f"チャンネル {channel.name} が見つかりました")
             
+            # メンションするユーザーIDを取得
+            mention_user_id = None
+            try:
+                # email_settings.jsonからメンションするユーザーIDを取得
+                email_settings = config.get_email_settings()
+                if "discord" in email_settings and "mention_user_id" in email_settings["discord"]:
+                    mention_user_id = email_settings["discord"]["mention_user_id"]
+                    logger.info(f"メンションするユーザーID: {mention_user_id}")
+            except Exception as e:
+                logger.error(f"メンションするユーザーIDの取得に失敗しました: {e}")
+            
             # メール情報を整形
             embed = discord.Embed(
                 title=f"新しいメール: {email_data['subject']}",
@@ -591,7 +604,13 @@ class DiscordBot:
             # タイムアウト処理を追加
             async with async_timeout(10):  # 10秒のタイムアウト
                 logger.info("embedメッセージを送信中...")
-                await channel.send(embed=embed)
+                # メンションするユーザーIDがある場合は、メンションを付ける
+                if mention_user_id:
+                    mention_text = f"<@{mention_user_id}> 新しいメールが届きました！"
+                    await channel.send(mention_text, embed=embed)
+                else:
+                    await channel.send(embed=embed)
+                
                 logger.info("返信候補生成メッセージを送信中...")
                 await channel.send("返信候補を生成中...")
             

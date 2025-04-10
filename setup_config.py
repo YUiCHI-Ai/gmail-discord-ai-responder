@@ -292,6 +292,9 @@ def setup_email_settings():
                 "name": "",
                 "email": "",
                 "url": ""
+            },
+            "discord": {
+                "mention_user_id": ""
             }
         }
     
@@ -310,6 +313,10 @@ def setup_email_settings():
     email = get_input("メールアドレス", default=settings["signature"]["email"], validator=validate_email)
     url = get_input("ウェブサイトURL", default=settings["signature"]["url"])
     
+    # Discord設定
+    print("\n--- Discord設定 ---")
+    mention_user_id = get_input("メール確認時にメンションするユーザーID", default="432550702032617473", validator=validate_discord_id)
+    
     # 設定を更新
     settings["calendar"]["days"] = int(days)
     settings["calendar"]["working_hours"]["start"] = int(start_hour)
@@ -321,6 +328,8 @@ def setup_email_settings():
     settings["signature"]["name"] = name
     settings["signature"]["email"] = email
     settings["signature"]["url"] = url
+    
+    settings["discord"]["mention_user_id"] = mention_user_id
     
     # 設定をJSONファイルに保存
     with open(settings_file, 'w', encoding='utf-8') as f:
