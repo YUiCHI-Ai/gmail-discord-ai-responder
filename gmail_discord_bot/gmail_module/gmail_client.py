@@ -216,7 +216,7 @@ class GmailClient:
             logger.error(f"スレッド詳細取得エラー: {e}")
             return None
     
-    def send_email(self, to, subject, body, thread_id=None, message_id=None, references=None, quote_original=False):
+    def send_email(self, to, subject, body, thread_id=None, message_id=None, references=None, quote_original=False, reply_all=False, cc=None):
         """メールを送信する
         
         Args:
@@ -227,35 +227,61 @@ class GmailClient:
             message_id: 返信元メッセージID（返信の場合）
             references: 参照メッセージID（返信の場合）
             quote_original: 元のメッセージを引用するかどうか
+            reply_all: 全員に返信するかどうか
+            cc: CCに含めるメールアドレス（カンマ区切りの文字列またはリスト）
             
         Returns:
             送信成功時: 送信結果の辞書
             送信失敗時: None
         """
         try:
+            # CCアドレスの初期化
+            cc_addresses = []
+            if cc:
+                if isinstance(cc, list):
+                    cc_addresses = cc
+                else:
+                    cc_addresses = [addr.strip() for addr in cc.split(',')]
             # 元のメッセージを引用する場合
             original_message_body = ""
-            if quote_original and thread_id and message_id:
+            original_cc = []
+            
+            if (quote_original or reply_all) and thread_id and message_id:
                 try:
                     # スレッドを取得して最新のメッセージを取得
                     thread = self.get_thread(thread_id)
                     if thread and 'messages' in thread:
                         # スレッド内の最新メッセージを探す
+                        original_message = None
                         for msg in thread['messages']:
                             msg_headers = msg['payload']['headers']
                             for header in msg_headers:
-                                if header['name'] == 'Message-Id' and message_id in header['value']:
-                                    # メッセージの本文を取得
-                                    if 'parts' in msg['payload']:
-                                        for part in msg['payload']['parts']:
-                                            if part['mimeType'] == 'text/plain':
-                                                original_message_body = base64.urlsafe_b64decode(
-                                                    part['body']['data']).decode('utf-8')
-                                                break
-                                    elif 'body' in msg['payload'] and 'data' in msg['payload']['body']:
-                                        original_message_body = base64.urlsafe_b64decode(
-                                            msg['payload']['body']['data']).decode('utf-8')
+                                if header['name'].lower() == 'message-id' and message_id in header['value']:
+                                    original_message = msg
                                     break
+                        
+                        # 元のメッセージが見つかった場合
+                        if original_message:
+                            # メッセージの本文を取得
+                            if 'parts' in original_message['payload']:
+                                for part in original_message['payload']['parts']:
+                                    if part['mimeType'] == 'text/plain':
+                                        original_message_body = base64.urlsafe_b64decode(
+                                            part['body']['data']).decode('utf-8')
+                                        break
+                            elif 'body' in original_message['payload'] and 'data' in original_message['payload']['body']:
+                                original_message_body = base64.urlsafe_b64decode(
+                                    original_message['payload']['body']['data']).decode('utf-8')
+                            
+                            # Reply Allの場合、元のメッセージからCCを取得
+                            if reply_all:
+                                for header in original_message['payload']['headers']:
+                                    if header['name'].lower() == 'cc':
+                                        # CCアドレスを取得してリストに追加
+                                        cc_from_original = [addr.strip() for addr in header['value'].split(',')]
+                                        original_cc = cc_from_original
+                                        logger.info(f"元のメッセージからCCを取得: {original_cc}")
+                                        break
                     
                     # 元のメッセージを引用形式に変換
                     if original_message_body:
@@ -274,6 +300,23 @@ class GmailClient:
             message['To'] = to
             message['Subject'] = subject
             message['From'] = self.get_user_email()  # 送信者のメールアドレスを設定
+            
+            # CCの設定
+            if reply_all and original_cc:
+                # 自分自身のアドレスをCCから除外
+                my_email = self.get_user_email()
+                filtered_cc = [cc_addr for cc_addr in original_cc if cc_addr != my_email and cc_addr != to]
+                
+                # ユーザー指定のCCと元のメールのCCをマージ
+                all_cc = list(set(filtered_cc + cc_addresses))
+                
+                if all_cc:
+                    message['Cc'] = ', '.join(all_cc)
+                    logger.info(f"CCを設定: {message['Cc']}")
+            elif cc_addresses:
+                # 通常の返信でCCが指定されている場合
+                message['Cc'] = ', '.join(cc_addresses)
+                logger.info(f"CCを設定: {message['Cc']}")
             
             # 返信ヘッダーの設定（返信の場合）
             if message_id:

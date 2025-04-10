@@ -93,6 +93,7 @@ class FinalSendConfirmView(ui.View):
         self.response_text = response_text
         self.bot = bot
         self.discord_bot = discord_bot  # DiscordBotインスタンスを保持
+        self.reply_all = False  # デフォルトは通常返信
     
     @ui.button(label="編集する", style=ButtonStyle.primary, custom_id="final_edit", row=0)
     async def final_edit_button(self, interaction: discord.Interaction, button: ui.Button):
@@ -113,16 +114,32 @@ class FinalSendConfirmView(ui.View):
             logger.error(f"詳細なエラー情報: {traceback.format_exc()}")
             await interaction.response.send_message(f"エラーが発生しました: {str(e)}", ephemeral=True)
     
-    @ui.button(label="はい、送信します", style=ButtonStyle.success, custom_id="final_confirm", row=0)
-    async def final_confirm_button(self, interaction: discord.Interaction, button: ui.Button):
+    @ui.button(label="通常返信", style=ButtonStyle.success, custom_id="normal_reply", row=0)
+    async def normal_reply_button(self, interaction: discord.Interaction, button: ui.Button):
         try:
-            await interaction.response.send_message("メールを送信しています...")
-            # 送信イベントを発火
-            self.bot.dispatch('send_email', self.channel_id, self.option_number)
-            logger.info(f"メール送信イベントを発火しました: チャンネルID {self.channel_id}, オプション {self.option_number}")
+            self.reply_all = False
+            await interaction.response.send_message("通常返信モードでメールを送信しています...")
+            # 送信イベントを発火（reply_all=Falseを指定）
+            self.bot.dispatch('send_email', self.channel_id, self.option_number, False)
+            logger.info(f"通常返信モードでメール送信イベントを発火しました: チャンネルID {self.channel_id}, オプション {self.option_number}")
             self.stop()
         except Exception as e:
-            logger.error(f"メール送信ボタン処理エラー: {e}")
+            logger.error(f"通常返信ボタン処理エラー: {e}")
+            import traceback
+            logger.error(f"詳細なエラー情報: {traceback.format_exc()}")
+            await interaction.response.send_message(f"エラーが発生しました: {str(e)}", ephemeral=True)
+    
+    @ui.button(label="全員に返信", style=ButtonStyle.primary, custom_id="reply_all", row=0)
+    async def reply_all_button(self, interaction: discord.Interaction, button: ui.Button):
+        try:
+            self.reply_all = True
+            await interaction.response.send_message("全員返信モードでメールを送信しています...")
+            # 送信イベントを発火（reply_all=Trueを指定）
+            self.bot.dispatch('send_email', self.channel_id, self.option_number, True)
+            logger.info(f"全員返信モードでメール送信イベントを発火しました: チャンネルID {self.channel_id}, オプション {self.option_number}")
+            self.stop()
+        except Exception as e:
+            logger.error(f"全員返信ボタン処理エラー: {e}")
             import traceback
             logger.error(f"詳細なエラー情報: {traceback.format_exc()}")
             await interaction.response.send_message(f"エラーが発生しました: {str(e)}", ephemeral=True)
@@ -264,7 +281,7 @@ class DiscordBot:
             logger.info('------')
             
         @self.bot.event
-        async def on_send_email(channel_id, option_number):
+        async def on_send_email(channel_id, option_number, reply_all=False):
             """メール送信イベントを処理"""
             logger.info(f"メール送信イベント: チャンネルID {channel_id}, オプション {option_number}")
             
@@ -328,7 +345,8 @@ class DiscordBot:
                     thread_id=thread_id,
                     message_id=message_id,
                     references=references,
-                    quote_original=True  # 元のメッセージを引用する
+                    quote_original=True,  # 元のメッセージを引用する
+                    reply_all=reply_all   # 全員に返信するかどうか
                 )
                 
                 if result:
@@ -340,7 +358,8 @@ class DiscordBot:
                         f"送信先: {to_email}\n"
                         f"件名: {subject}\n"
                         f"メールID: {result['id']}\n"
-                        f"引用モード: 有効"  # 引用モードが有効であることを表示
+                        f"引用モード: 有効\n"
+                        f"全員返信モード: {'有効' if reply_all else '無効'}"  # 全員返信モードの状態を表示
                     )
                     if thread_id:
                         success_message += f"\nスレッドID: {thread_id}"
