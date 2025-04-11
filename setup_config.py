@@ -246,6 +246,49 @@ def setup_email_mapping():
     print_success(f"{mapping_file} を作成しました")
     return True
 
+def setup_email_user_mapping():
+    """メールとユーザーのマッピングファイルを作成"""
+    print_step("email_user_mapping.jsonファイルの設定")
+    
+    config_dir = Path("gmail_discord_bot/config")
+    mapping_example = config_dir / "email_user_mapping.json.example"
+    mapping_file = config_dir / "email_user_mapping.json"
+    
+    if not mapping_example.exists():
+        print_error(f"{mapping_example} が見つかりません。リポジトリが正しくクローンされているか確認してください。")
+        return False
+    
+    # 既存のマッピングファイルがあるか確認
+    if mapping_file.exists():
+        overwrite = get_input("既存のマッピングファイルが見つかりました。上書きしますか？ (yes/no)", default="no")
+        if overwrite.lower() != "yes":
+            print_warning("マッピングファイルの設定をスキップします")
+            return True
+    
+    # マッピング情報を入力
+    mappings = {}
+    
+    print("\nメールアドレスとDiscordユーザーIDのマッピングを設定します")
+    print("完了したら、メールアドレスの入力時に何も入力せずにEnterを押してください")
+    
+    while True:
+        email = get_input("メールアドレス（例: user@example.com または *@example.com）", required=False, validator=validate_email)
+        if not email:
+            break
+        
+        user_id = get_input("Discord ユーザーID", required=True, validator=validate_discord_id)
+        
+        mappings[email] = user_id
+        
+        print_success(f"マッピングを追加しました: {email} -> ユーザーID: {user_id}")
+    
+    # マッピング情報をJSONファイルに保存
+    with open(mapping_file, 'w', encoding='utf-8') as f:
+        json.dump(mappings, f, ensure_ascii=False, indent=2)
+    
+    print_success(f"{mapping_file} を作成しました")
+    return True
+
 def setup_email_settings():
     """メール設定ファイルを作成"""
     print_step("email_settings.jsonファイルの設定")
@@ -394,6 +437,10 @@ def main():
     
     if not setup_email_mapping():
         print_error("email_channel_mapping.jsonファイルの設定に失敗しました。セットアップを中止します。")
+        return
+    
+    if not setup_email_user_mapping():
+        print_error("email_user_mapping.jsonファイルの設定に失敗しました。セットアップを中止します。")
         return
     
     if not setup_email_settings():

@@ -567,11 +567,29 @@ class DiscordBot:
             # メンションするユーザーIDを取得
             mention_user_id = None
             try:
-                # email_settings.jsonからメンションするユーザーIDを取得
-                email_settings = config.get_email_settings()
-                if "discord" in email_settings and "mention_user_id" in email_settings["discord"]:
-                    mention_user_id = email_settings["discord"]["mention_user_id"]
-                    logger.info(f"メンションするユーザーID: {mention_user_id}")
+                # 送信者のメールアドレスを抽出
+                sender_email = self._extract_email_address(email_data['sender'])
+                
+                # email_user_mapping.jsonからメンションするユーザーIDを取得
+                email_user_mapping = config.get_email_user_mapping()
+                
+                # 完全一致
+                if sender_email in email_user_mapping:
+                    mention_user_id = email_user_mapping[sender_email]
+                    logger.info(f"メールアドレス {sender_email} に対応するユーザーID: {mention_user_id}")
+                else:
+                    # ドメイン一致（*@example.com形式）
+                    domain = sender_email.split('@')[-1]
+                    wildcard = f"*@{domain}"
+                    if wildcard in email_user_mapping:
+                        mention_user_id = email_user_mapping[wildcard]
+                        logger.info(f"ワイルドカード {wildcard} に対応するユーザーID: {mention_user_id}")
+                    else:
+                        # デフォルトのメンションユーザーIDを取得
+                        email_settings = config.get_email_settings()
+                        if "discord" in email_settings and "mention_user_id" in email_settings["discord"]:
+                            mention_user_id = email_settings["discord"]["mention_user_id"]
+                            logger.info(f"デフォルトのメンションユーザーID: {mention_user_id}")
             except Exception as e:
                 logger.error(f"メンションするユーザーIDの取得に失敗しました: {e}")
             

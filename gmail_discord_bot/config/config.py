@@ -42,6 +42,9 @@ NAME_DATABASE_FILE = DATA_DIR / "name_database.json"
 # メールとチャンネルのマッピング
 EMAIL_CHANNEL_MAPPING_FILE = config_dir / os.getenv("EMAIL_CHANNEL_MAPPING_FILE", "email_channel_mapping.json")
 
+# メールとユーザーのマッピング
+EMAIL_USER_MAPPING_FILE = config_dir / os.getenv("EMAIL_USER_MAPPING_FILE", "email_user_mapping.json")
+
 # メール設定ファイル
 EMAIL_SETTINGS_FILE = config_dir / "email_settings.json"
 
@@ -62,6 +65,25 @@ def save_email_channel_mapping(mapping):
         return True
     except Exception as e:
         print(f"マッピング保存エラー: {e}")
+        return False
+
+def get_email_user_mapping():
+    """メールアドレスとDiscordユーザーIDのマッピングを取得"""
+    try:
+        with open(EMAIL_USER_MAPPING_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        # デフォルトの空のマッピングを返す
+        return {}
+
+def save_email_user_mapping(mapping):
+    """メールアドレスとDiscordユーザーIDのマッピングを保存"""
+    try:
+        with open(EMAIL_USER_MAPPING_FILE, 'w', encoding='utf-8') as f:
+            json.dump(mapping, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception as e:
+        print(f"ユーザーマッピング保存エラー: {e}")
         return False
 
 def get_email_analyzer_prompt():
