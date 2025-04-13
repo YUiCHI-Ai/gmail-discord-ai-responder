@@ -105,37 +105,45 @@ class ScheduleAnalyzer:
                 best_match = best_matches[0]
                 selected_slot = best_match["clean_slot"]
                 
-                # 代替スロットを選択（最適なスロットと同じ日付のものは除外）
-                alternative_slots = []
-                best_date = self._extract_date_from_slot(best_match["slot"])
-                
-                for match in best_matches[1:4]:  # 2位〜4位のマッチを確認
-                    match_date = self._extract_date_from_slot(match["slot"])
-                    if match_date != best_date:  # 最適なスロットと異なる日付のみ
-                        alternative_slots.append(match["clean_slot"])
-                
-                # 代替スロットが足りない場合は、他の利用可能なスロットから補完
-                if len(alternative_slots) < 2:
-                    # 日付でグループ化して、各日付から1つずつ選ぶ
-                    date_groups = {}
-                    for slot in structured_slots:
-                        slot_date = self._extract_date_from_slot(slot["original"])
-                        if slot_date != best_date and slot_date not in [self._extract_date_from_slot(alt) for alt in alternative_slots]:
-                            if slot_date not in date_groups:
-                                date_groups[slot_date] = []
-                            date_groups[slot_date].append(self._remove_year_from_slot(slot["original"]))
+                # 日程候補が1つだけの場合は代替スロットを提案しない
+                if len(suggested_dates) == 1:
+                    logger.info(f"相手から1つの日程のみ指定されており、その日程が空いています: {selected_slot}")
+                    alternative_slots = []
+                else:
+                    # 代替スロットを選択（最適なスロットと同じ日付のものは除外）
+                    alternative_slots = []
+                    best_date = self._extract_date_from_slot(best_match["slot"])
                     
-                    # 各日付グループから1つずつ選択
-                    for date, slots in sorted(date_groups.items())[:3-len(alternative_slots)]:
-                        alternative_slots.append(slots[0])
-                
-                # 最大3つまで
-                alternative_slots = alternative_slots[:3]
+                    for match in best_matches[1:4]:  # 2位〜4位のマッチを確認
+                        match_date = self._extract_date_from_slot(match["slot"])
+                        if match_date != best_date:  # 最適なスロットと異なる日付のみ
+                            alternative_slots.append(match["clean_slot"])
+                    
+                    # 代替スロットが足りない場合は、他の利用可能なスロットから補完
+                    if len(alternative_slots) < 2:
+                        # 日付でグループ化して、各日付から1つずつ選ぶ
+                        date_groups = {}
+                        for slot in structured_slots:
+                            slot_date = self._extract_date_from_slot(slot["original"])
+                            if slot_date != best_date and slot_date not in [self._extract_date_from_slot(alt) for alt in alternative_slots]:
+                                if slot_date not in date_groups:
+                                    date_groups[slot_date] = []
+                                date_groups[slot_date].append(self._remove_year_from_slot(slot["original"]))
+                        
+                        # 各日付グループから1つずつ選択
+                        for date, slots in sorted(date_groups.items())[:3-len(alternative_slots)]:
+                            alternative_slots.append(slots[0])
+                    
+                    # 最大3つまで
+                    alternative_slots = alternative_slots[:3]
                 
                 logger.info(f"最適なスロット: {selected_slot}, 代替スロット: {alternative_slots}")
                 
                 # メッセージを生成（年を含まない）
-                message = f"提案された日程の中で利用可能なスロットが見つかりました: {selected_slot}"
+                if len(suggested_dates) == 1 and not alternative_slots:
+                    message = f"ご希望の日程（{selected_slot}）で承りました。"
+                else:
+                    message = f"提案された日程の中で利用可能なスロットが見つかりました: {selected_slot}"
                 
                 return {
                     "has_match": True,
