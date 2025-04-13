@@ -817,4 +817,30 @@ class DiscordBot:
             logger.error(f"その他情報リクエスト送信エラー: {e}")
             return False
     
+    def _extract_email_address(self, sender):
+        """
+        メールアドレスを抽出するヘルパーメソッド
+        例: "John Doe <john@example.com>" から "john@example.com" を抽出
+        """
+        try:
+            # <> で囲まれたメールアドレスを抽出
+            if '<' in sender and '>' in sender:
+                start = sender.find('<') + 1
+                end = sender.find('>')
+                if start < end:
+                    return sender[start:end].strip()
+            
+            # メールアドレスらしき文字列を抽出（単純な実装）
+            import re
+            email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
+            match = re.search(email_pattern, sender)
+            if match:
+                return match.group(0)
+            
+            # 抽出できない場合は元の文字列を返す
+            return sender
+        except Exception as e:
+            logger.error(f"メールアドレス抽出エラー: {e}")
+            return sender
+    
     # テスト用メソッドを削除しました
